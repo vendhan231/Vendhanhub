@@ -1,660 +1,359 @@
+import { useState, useEffect } from "react";
+import { apiFetchProjects, apiAddProject, apiUpdateProject, apiDeleteProject } from "../../services/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { FolderPlus, Loader2, Trash2, Calculator, Pencil } from "lucide-react";
+import { ProjectFieldBuilder, type ProjectField } from "./ProjectFieldBuilder";
 
-import React, { useState, useEffect, FormEvent } from 'react';
-import { apiFetchProjects, apiAddProject, apiUpdateProject, apiDeleteProject } from '../../services/api';
-import { Project, FieldConfig, BillingConfig } from '../../types';
-import { THEME } from '../../constants';
-import { PlusCircleIcon, PencilSquareIcon, TrashIcon, XMarkIcon, BeakerIcon, DocumentTextIcon } from '@heroicons/react/24/outline';
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  billing_formula: string;
+  item_fields: ProjectField[];
+  is_active: boolean;
+  edit_window_hours: number;
+}
 
-const ManageProjects: React.FC = () => {
+const ProjectManagement = () => {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [currentProject, setCurrentProject] = useState<Partial<Project> | null>(null); 
-  
-  const [projectName, setProjectName] = useState('');
-  const [fieldConfig, setFieldConfig] = useState<{
-    report_level: FieldConfig[];
-    item_level: FieldConfig[];
-  }>({
-    report_level: [],
-    item_level: []
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [formData, setFormData] = useState({
+    name: "",
+    description: "",
+    billingFormula: "",
+    editWindowHours: 24,
   });
-  const [billingConfig, setBillingConfig] = useState<BillingConfig>({
-    rateType: 'custom_formula',
-    rateValue: 0,
-    countField: '',
-    formula: ''
-  });
-  const [formError, setFormError] = useState<string | null>(null);
-
-  // Legacy fields for backward compatibility (kept for potential future use)
-  // const [billingType, setBillingType] = useState<ProjectBillingType>('hourly');
-  // const [ratePerHour, setRatePerHour] = useState<number | ''>('');
-  // const [countMetricLabel, setCountMetricLabel] = useState('');
-  // const [countDivisor, setCountDivisor] = useState<number | ''>(1);
-  // const [countMultiplier, setCountMultiplier] = useState<number | ''>('');
-
-  useEffect(() => {
-    loadProjects();
-  }, []);
-
-  useEffect(() => {
-    const lowercasedFilter = searchTerm.toLowerCase();
-    const filteredData = projects.filter(project =>
-      project.name.toLowerCase().includes(lowercasedFilter)
-    );
-    setFilteredProjects(filteredData);
-  }, [searchTerm, projects]);
+  const [fields, setFields] = useState<ProjectField[]>([]);
+  const [testValues, setTestValues] = useState<Record<string, number>>({});
+  const [calculatedTest, setCalculatedTest] = useState<number>(0);
 
   const loadProjects = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const fetchedProjects = await apiFetchProjects();
-      setProjects(fetchedProjects);
-      // setFilteredProjects(fetchedProjects); // Handled by useEffect
-    } catch (err: any) {
-      setError(err.message || 'Failed to load projects.');
+  const fetched = await apiFetchProjects();
+  setProjects((fetched || []) as unknown as Project[]);
+    } catch (error: any) {
+      toast.error("Failed to load projects");
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  const resetFormFields = () => {
-    setProjectName('');
-    setFieldConfig({
-      report_level: [],
-      item_level: []
-    });
-    setBillingConfig({
-      rateType: 'custom_formula',
-      rateValue: 0,
-      countField: '',
-      formula: ''
-    });
-    setFormError(null);
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const testFormula = () => {
+    try {
+      let formula = formData.billingFormula;
+
+      fields.forEach((field) => {
+        if (field.type === 'number') {
+          const value = testValues[field.label] || 0;
+          formula = formula.replace(new RegExp(field.label, 'g'), value.toString());
+        }
+      });
+
+      const result = eval(formula);
+      setCalculatedTest(Number(result) || 0);
+      toast.success(`Formula test: Rs. ${Number(result).toFixed(2)}`);
+    } catch (e) {
+      toast.error("Invalid formula syntax");
+      setCalculatedTest(0);
+    }
   };
 
-  const openModalForAdd = () => {
-    setCurrentProject(null);
-    resetFormFields();
-    setIsModalOpen(true);
+  const resetForm = () => {
+    setFormData({ name: "", description: "", billingFormula: "", editWindowHours: 24 });
+    setFields([]);
+    setTestValues({});
+    setCalculatedTest(0);
   };
 
-  const openModalForEdit = (project: Project) => {
-    setCurrentProject(project);
-    setProjectName(project.name);
-    setFieldConfig(project.fieldConfig || { report_level: [], item_level: [] });
-    setBillingConfig(project.billingConfig || { rateType: 'custom_formula', rateValue: 0, formula: '' });
-    setFormError(null);
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setCurrentProject(null);
-    resetFormFields();
-  };
-
-  const handleFormSubmit = async (e: FormEvent) => {
+  const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFormError(null);
 
-    if (!projectName.trim()) {
-      setFormError('Project name is required.');
+    if (fields.length === 0) {
+      toast.error("Please add at least one field");
       return;
     }
 
-    // Validate field configurations
-    if (fieldConfig.report_level.length === 0 && fieldConfig.item_level.length === 0) {
-      setFormError('At least one field must be configured for report or item level.');
-      return;
-    }
-
-    // Validate billing configuration
-    if (billingConfig.rateType === 'custom_formula') {
-      if (!billingConfig.formula?.trim()) {
-        setFormError('Formula is required for custom formula billing.');
-        return;
-      }
-      // Check if formula contains at least one numeric field
-      const numericFields = fieldConfig.item_level.filter(f => f.type === 'number' && f.includeInBilling);
-      const hasNumericFieldInFormula = numericFields.some(field =>
-        billingConfig.formula!.includes(field.label)
-      );
-      if (!hasNumericFieldInFormula) {
-        setFormError('Formula must include at least one numeric field marked for billing.');
-        return;
-      }
-    } else if (billingConfig.rateValue <= 0) {
-      setFormError('Rate value must be greater than 0.');
-      return;
-    }
-
-    if (billingConfig.rateType === 'per_count_field' && !billingConfig.countField) {
-      setFormError('Count field is required for per count field billing.');
-      return;
-    }
-
-    const projectData = {
-      name: projectName.trim(),
-      fieldConfig,
-      billingConfig,
-    };
+    setLoading(true);
 
     try {
-      if (currentProject && currentProject.id) {
-        const updatedProject = await apiUpdateProject(currentProject.id, projectData);
-        setProjects(projects.map(p => p.id === updatedProject.id ? updatedProject : p));
+      if (editingProject) {
+        await apiUpdateProject(editingProject.id, {
+          name: formData.name,
+          description: formData.description,
+          billing_formula: formData.billingFormula,
+          item_fields: fields as any,
+          edit_window_hours: formData.editWindowHours,
+        } as any);
+        toast.success("Project updated successfully");
       } else {
-        const newProject = await apiAddProject(projectData);
-        setProjects([...projects, newProject]);
+        await apiAddProject({
+          name: formData.name,
+          description: formData.description,
+          billing_formula: formData.billingFormula,
+          item_fields: fields as any,
+          edit_window_hours: formData.editWindowHours,
+          created_by: null,
+          is_active: true,
+        } as any);
+        toast.success("Project created successfully");
       }
-      closeModal();
-    } catch (err: any) {
-      setFormError(err.message || 'Failed to save project.');
+
+      setDialogOpen(false);
+      setEditingProject(null);
+      resetForm();
+      loadProjects();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save project");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleEdit = (project: Project) => {
+    setEditingProject(project);
+    setFormData({
+      name: project.name,
+      description: project.description,
+      billingFormula: project.billing_formula,
+      editWindowHours: project.edit_window_hours || 24,
+    });
+    setFields(project.item_fields || []);
+    setDialogOpen(true);
   };
 
   const handleDeleteProject = async (projectId: string) => {
-    if (window.confirm('Are you sure you want to delete this project? This action cannot be undone.')) {
-      try {
-        await apiDeleteProject(projectId);
-        setProjects(projects.filter(p => p.id !== projectId));
-        alert('Project deleted successfully.');
-      } catch (err: any) {
-         setError(err.message || 'Failed to delete project.');
-         alert(`Error: ${err.message || 'Failed to delete project.'}`);
-      }
+    if (!confirm("Are you sure you want to delete this project?")) return;
+
+    try {
+      await apiDeleteProject(projectId);
+      toast.success("Project deleted successfully");
+      loadProjects();
+    } catch (error: any) {
+      toast.error("Failed to delete project");
+      console.error(error);
     }
   };
-  
-  const formatCurrency = (amount?: number): string => {
-    if (amount === undefined || amount === null) return 'N/A';
-    return `₹${amount.toFixed(2)}`;
-  };
-  
-  const inputBaseClasses = `mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`;
-  const selectBaseClasses = `mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`;
-
-
-  if (loading && projects.length === 0) {
-    return (
-      <div className={`p-6 bg-white rounded-xl shadow-lg text-center text-${THEME.accentText}`}>
-        <svg className={`animate-spin h-8 w-8 text-${THEME.primary} mx-auto mb-2`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-        </svg>
-        Loading projects...
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className={`p-6 bg-red-100 text-red-700 rounded-xl shadow-lg`}>Error: {error}</div>;
-  }
 
   return (
-    <div className={`p-6 bg-white rounded-xl shadow-lg`}>
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-        <h2 className={`text-2xl font-semibold text-${THEME.primary}`}>Manage Projects</h2>
-         <input
-            type="text"
-            placeholder="Filter by project name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className={`${inputBaseClasses} sm:w-64 w-full`}
-        />
-        <button
-          onClick={openModalForAdd}
-          className={`inline-flex items-center px-4 py-2 bg-${THEME.primary} text-${THEME.primaryText} text-sm font-medium rounded-md hover:bg-opacity-85 transition focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-${THEME.primary} w-full sm:w-auto justify-center`}
-        >
-          <PlusCircleIcon className="h-5 w-5 mr-2" />
-          Add New Project
-        </button>
-      </div>
-      
-      {loading && <p className={`text-sm text-${THEME.accentText} my-2`}>Refreshing project list...</p>}
-      {filteredProjects.length === 0 ? (
-        <p className={`text-center text-gray-500 py-8`}>{searchTerm ? 'No projects match your search.' : 'No projects found. Add one to get started.'}</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white">
-            <thead className={`bg-gray-50 border-b-2 border-${THEME.primary}`}>
-              <tr>
-                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Project Name</th>
-                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Type</th>
-                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Billing Config</th>
-                <th className="py-3 px-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProjects.map(project => (
-                <tr key={project.id} className="border-b border-gray-200 hover:bg-gray-50">
-                  <td className="py-3 px-4 text-sm text-gray-700">{project.name}</td>
-                  <td className="py-3 px-4 text-sm text-gray-700">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800`}>
-                      <DocumentTextIcon className="h-3 w-3 mr-1"/>
-                      Data Entry
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-sm text-gray-700">
-                    {project.billingConfig ? (
-                      <div>
-                        <div>Rate: {formatCurrency(project.billingConfig.rateValue)}</div>
-                        <div>Type: {project.billingConfig.rateType.replace('_', ' ')}</div>
-                        {project.billingConfig.countField && (
-                          <div>Field: {project.billingConfig.countField}</div>
-                        )}
-                      </div>
-                    ) : (
-                      'Legacy billing'
-                    )}
-                  </td>
-                  <td className="py-3 px-4 text-sm text-gray-700 text-right">
-                    <button 
-                      onClick={() => openModalForEdit(project)}
-                      className={`p-1.5 text-gray-500 hover:text-${THEME.secondary} transition-colors mr-2`}
-                      title="Edit Project"
-                    >
-                      <PencilSquareIcon className="h-5 w-5" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteProject(project.id)}
-                      className={`p-1.5 text-gray-500 hover:text-red-600 transition-colors`}
-                      title="Delete Project"
-                    >
-                      <TrashIcon className="h-5 w-5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Modal for Add/Edit Project */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4 overflow-y-auto">
-          <div className={`bg-white p-6 rounded-lg shadow-xl w-full max-w-lg my-8`}>
-            <div className="flex justify-between items-center mb-4">
-              <h3 className={`text-xl font-semibold text-${THEME.primary}`}>
-                {currentProject?.id ? 'Edit Project' : 'Add New Project'}
-              </h3>
-              <button onClick={closeModal} className={`text-gray-400 hover:text-gray-600`}>
-                <XMarkIcon className="h-6 w-6" />
-              </button>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Project Management</CardTitle>
+              <CardDescription>Create and manage projects with dynamic fields and billing formulas</CardDescription>
             </div>
-            <form onSubmit={handleFormSubmit} className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-              <div>
-                <label htmlFor="modalProjectName" className={`block text-sm font-medium text-${THEME.accentText}`}>Project Name</label>
-                <input
-                  type="text"
-                  id="modalProjectName"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className={inputBaseClasses}
-                  required
-                />
-              </div>
-
-              {/* Field Configuration */}
-              <div className="border-t pt-4">
-                <h4 className={`text-md font-medium text-${THEME.primary} mb-3`}>Field Configuration</h4>
-
-                {/* Report Level Fields */}
-                <div className="mb-4">
-                  <label className={`block text-sm font-medium text-${THEME.accentText} mb-2`}>Report Level Fields</label>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-primary" onClick={() => {
+                  setEditingProject(null);
+                  resetForm();
+                }}>
+                  <FolderPlus className="w-4 h-4 mr-2" />
+                  Add Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Create New Project</DialogTitle>
+                  <DialogDescription>
+                    Configure project with custom fields and billing formula
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleCreateProject} className="space-y-6">
                   <div className="space-y-2">
-                    {fieldConfig.report_level.map((field, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium">{field.label}</span>
-                          <span className="text-xs text-gray-500">({field.type})</span>
-                          {field.required && <span className="text-xs text-red-500">*</span>}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newLabel = prompt('New field label:', field.label);
-                              if (newLabel && newLabel !== field.label) {
-                                setFieldConfig(prev => ({
-                                  ...prev,
-                                  report_level: prev.report_level.map((f, i) => i === index ? { ...f, label: newLabel } : f)
-                                }));
-                              }
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFieldConfig(prev => ({
-                                ...prev,
-                                report_level: prev.report_level.filter((_, i) => i !== index)
-                              }));
-                            }}
-                            className="text-xs text-red-600 hover:text-red-800"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const label = prompt('Field label:');
-                        const type = prompt('Field type (text/number/date/select/textarea):', 'text');
-                        if (label && type) {
-                          setFieldConfig(prev => ({
-                            ...prev,
-                            report_level: [...prev.report_level, { label, type: type as any, required: false }]
-                          }));
-                        }
-                      }}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      + Add Report Field
-                    </button>
-                  </div>
-                </div>
-
-                {/* Item Level Fields */}
-                <div className="mb-4">
-                  <label className={`block text-sm font-medium text-${THEME.accentText} mb-2`}>Item Level Fields</label>
-                  <div className="space-y-2">
-                    {/* Default Object_ID field */}
-                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded border">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-sm font-medium">Object_ID</span>
-                        <span className="text-xs text-gray-500">(text)</span>
-                        <span className="text-xs text-red-500">*</span>
-                        <span className="text-xs text-purple-500">unique</span>
-                      </div>
-                      <span className="text-xs text-gray-500">Default field</span>
-                    </div>
-
-                    {fieldConfig.item_level.map((field, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm font-medium">{field.label}</span>
-                          <span className="text-xs text-gray-500">({field.type})</span>
-                          {field.unique && <span className="text-xs text-purple-500">unique</span>}
-                          {field.required && <span className="text-xs text-red-500">*</span>}
-                          {field.includeInBilling && <span className="text-xs text-green-600">billing</span>}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <label className="flex items-center space-x-1">
-                            <input
-                              type="checkbox"
-                              checked={field.required || false}
-                              onChange={(e) => {
-                                setFieldConfig(prev => ({
-                                  ...prev,
-                                  item_level: prev.item_level.map((f, i) => i === index ? { ...f, required: e.target.checked } : f)
-                                }));
-                              }}
-                              className="h-3 w-3"
-                            />
-                            <span className="text-xs">Required</span>
-                          </label>
-                          {field.type === 'number' && (
-                            <label className="flex items-center space-x-1">
-                              <input
-                                type="checkbox"
-                                checked={field.includeInBilling || false}
-                                onChange={(e) => {
-                                  setFieldConfig(prev => ({
-                                    ...prev,
-                                    item_level: prev.item_level.map((f, i) => i === index ? { ...f, includeInBilling: e.target.checked } : f)
-                                  }));
-                                }}
-                                className="h-3 w-3"
-                              />
-                              <span className="text-xs">Billing</span>
-                            </label>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const newLabel = prompt('New field label:', field.label);
-                              if (newLabel && newLabel !== field.label) {
-                                setFieldConfig(prev => ({
-                                  ...prev,
-                                  item_level: prev.item_level.map((f, i) => i === index ? { ...f, label: newLabel } : f)
-                                }));
-                              }
-                            }}
-                            className="text-xs text-blue-600 hover:text-blue-800"
-                          >
-                            Rename
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFieldConfig(prev => ({
-                                ...prev,
-                                item_level: prev.item_level.filter((_, i) => i !== index)
-                              }));
-                            }}
-                            className="text-xs text-red-600 hover:text-red-800"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const label = prompt('Field label:');
-                        const type = prompt('Field type (text/number/date/select/textarea):', 'text');
-                        if (label && type) {
-                          setFieldConfig(prev => ({
-                            ...prev,
-                            item_level: [...prev.item_level, { label, type: type as any, unique: false, required: false, includeInBilling: false }]
-                          }));
-                        }
-                      }}
-                      className="text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      + Add Item Field
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Billing Configuration */}
-              <div className="border-t pt-4">
-                <h4 className={`text-md font-medium text-${THEME.primary} mb-3`}>Billing Configuration</h4>
-
-                <div className="mb-4">
-                  <label htmlFor="rateType" className={`block text-sm font-medium text-${THEME.accentText} mb-2`}>Rate Type</label>
-                  <select
-                    id="rateType"
-                    value={billingConfig.rateType}
-                    onChange={(e) => setBillingConfig(prev => ({ ...prev, rateType: e.target.value as any }))}
-                    className={selectBaseClasses}
-                  >
-                    <option value="custom_formula">Custom Formula</option>
-                    <option value="per_item">Per Item</option>
-                    <option value="per_record">Per Record</option>
-                    <option value="per_count_field">Per Count Field</option>
-                  </select>
-                </div>
-
-                {billingConfig.rateType === 'custom_formula' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="formula" className={`block text-sm font-medium text-${THEME.accentText} mb-2`}>Billing Formula</label>
-                      <textarea
-                        id="formula"
-                        value={billingConfig.formula || ''}
-                        onChange={(e) => setBillingConfig(prev => ({ ...prev, formula: e.target.value }))}
-                        className={`${inputBaseClasses} h-20`}
-                        placeholder="e.g., (CharacterCount / 1000) * Rate"
-                        required
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        💡 Tip: Use field labels in your billing formula (e.g., "(CharacterCount / 1000) * 4.85")
-                      </p>
-                    </div>
-
-                    {/* Field Reference Helper */}
-                    <div className="bg-blue-50 p-3 rounded">
-                      <h5 className="text-sm font-medium text-blue-800 mb-2">Available Fields for Formula:</h5>
-                      <div className="flex flex-wrap gap-2">
-                        {fieldConfig.item_level.filter(f => f.type === 'number' && f.includeInBilling).map((field, index) => (
-                          <span key={index} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            {field.label}
-                          </span>
-                        ))}
-                      </div>
-                      {fieldConfig.item_level.filter(f => f.type === 'number' && f.includeInBilling).length === 0 && (
-                        <p className="text-xs text-blue-600">No numeric fields marked for billing yet.</p>
-                      )}
-                    </div>
-
-                    {/* Formula Test Section */}
-                    <div className="border-t pt-4">
-                      <h5 className="text-sm font-medium text-gray-700 mb-3">Test Formula</h5>
-                      <div className="grid grid-cols-2 gap-4 mb-3">
-                        {fieldConfig.item_level.filter(f => f.type === 'number' && f.includeInBilling).map((field, index) => (
-                          <div key={index}>
-                            <label className={`block text-xs font-medium text-${THEME.accentText} mb-1`}>{field.label}</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              className={inputBaseClasses}
-                              placeholder={`Enter ${field.label} value`}
-                              onChange={(e) => {
-                                // Store test values in component state
-                                setFieldConfig(prev => ({
-                                  ...prev,
-                                  item_level: prev.item_level.map((f, i) => i === index ? { ...f, testValue: parseFloat(e.target.value) || 0 } : f)
-                                }));
-                              }}
-                            />
-                          </div>
-                        ))}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!billingConfig.formula) {
-                            alert('Please enter a formula first.');
-                            return;
-                          }
-
-                          try {
-                            const numericFields = fieldConfig.item_level.filter(f => f.type === 'number' && f.includeInBilling);
-                            let formula = billingConfig.formula;
-
-                            // Replace field names with test values
-                            numericFields.forEach(field => {
-                              const testValue = (field as any).testValue || 0;
-                              const regex = new RegExp(`\\b${field.label}\\b`, 'g');
-                              formula = formula.replace(regex, testValue.toString());
-                            });
-
-                            // Evaluate the formula safely
-                            const result = Function('"use strict"; return (' + formula + ')')();
-                            alert(`Formula result: ₹${result.toFixed(2)}`);
-                          } catch (error) {
-                            alert(`Formula error: ${(error as Error).message}`);
-                          }
-                        }}
-                        className={`px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition`}
-                      >
-                        <BeakerIcon className="h-4 w-4 inline mr-1" />
-                        Test Formula
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {(billingConfig.rateType === 'per_item' || billingConfig.rateType === 'per_record') && (
-                  <div>
-                    <label htmlFor="rateValue" className={`block text-sm font-medium text-${THEME.accentText}`}>Rate Value (₹)</label>
-                    <input
-                      type="number"
-                      id="rateValue"
-                      value={billingConfig.rateValue}
-                      onChange={(e) => setBillingConfig(prev => ({ ...prev, rateValue: parseFloat(e.target.value) || 0 }))}
-                      min="0.01"
-                      step="0.01"
-                      className={inputBaseClasses}
+                    <Label htmlFor="name">Project Name</Label>
+                    <Input
+                      id="name"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       required
                     />
                   </div>
-                )}
 
-                {billingConfig.rateType === 'per_count_field' && (
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="rateValue" className={`block text-sm font-medium text-${THEME.accentText}`}>Rate Value (₹)</label>
-                      <input
-                        type="number"
-                        id="rateValue"
-                        value={billingConfig.rateValue}
-                        onChange={(e) => setBillingConfig(prev => ({ ...prev, rateValue: parseFloat(e.target.value) || 0 }))}
-                        min="0.01"
-                        step="0.01"
-                        className={inputBaseClasses}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="countField" className={`block text-sm font-medium text-${THEME.accentText}`}>Count Field Name</label>
-                      <input
-                        type="text"
-                        id="countField"
-                        value={billingConfig.countField || ''}
-                        onChange={(e) => setBillingConfig(prev => ({ ...prev, countField: e.target.value }))}
-                        className={inputBaseClasses}
-                        placeholder="e.g., Record Count"
-                        required
-                      />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      rows={3}
+                    />
                   </div>
-                )}
-              </div>
-              
-              {formError && (
-                <div className="mt-2 p-2 bg-red-100 border border-red-300 text-red-700 text-sm rounded-md">
-                  {formError}
-                </div>
-              )}
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className={`px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none`}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-${THEME.primaryText} bg-${THEME.primary} hover:bg-opacity-85 focus:outline-none`}
-                >
-                  {currentProject?.id ? 'Save Changes' : 'Create Project'}
-                </button>
-              </div>
-            </form>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="editWindow">Edit Window (hours)</Label>
+                    <Input
+                      id="editWindow"
+                      type="number"
+                      min={1}
+                      value={formData.editWindowHours}
+                      onChange={(e) => setFormData({ ...formData, editWindowHours: Number(e.target.value) })}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Users can edit their own reports within this time window
+                    </p>
+                  </div>
+
+                  <ProjectFieldBuilder fields={fields} onChange={setFields} />
+
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="formula">Billing Formula (PRIVATE - Hidden from users)</Label>
+                      <Input
+                        id="formula"
+                        value={formData.billingFormula}
+                        onChange={(e) => setFormData({ ...formData, billingFormula: e.target.value })}
+                        placeholder="e.g., CharacterCount/1000*4.85"
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Use field labels from above. Example: (CharacterCount/1000)*4.85 or RecordCount*1.25
+                      </p>
+                    </div>
+
+                    {/* Formula Tester */}
+                    <Card className="bg-muted/50">
+                      <CardHeader>
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <Calculator className="w-4 h-4" />
+                          Formula Tester
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="grid gap-3 md:grid-cols-3">
+                          {fields.filter(f => f.type === 'number').map((field) => (
+                            <div key={field.id} className="space-y-1">
+                              <Label className="text-xs">{field.label}</Label>
+                              <Input
+                                type="number"
+                                value={testValues[field.label] || ""}
+                                onChange={(e) => setTestValues({
+                                  ...testValues,
+                                  [field.label]: Number(e.target.value),
+                                })}
+                                placeholder="0"
+                                className="h-8"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <Button type="button" variant="outline" size="sm" onClick={testFormula}>
+                            Calculate Test
+                          </Button>
+                          <span className="text-lg font-bold text-primary">
+                            Rs. {calculatedTest.toFixed(2)}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {editingProject ? "Update Project" : "Create Project"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
-        </div>
-      )}
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {projects.map((project) => (
+                <Card key={project.id} className="border-l-4 border-l-primary">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-xl">{project.name}</CardTitle>
+                        {project.description && (
+                          <CardDescription className="mt-2">
+                            {project.description}
+                          </CardDescription>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(project)}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteProject(project.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <span className="text-sm text-muted-foreground">Fields:</span>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/10 text-primary">
+                          Object_ID (text) *
+                        </span>
+                        {(project.item_fields ?? []).map((field) => (
+                          <span
+                            key={field.id}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-secondary text-secondary-foreground"
+                          >
+                            {field.label} ({field.type}) {field.required && '*'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm pt-2 border-t">
+                      <span className="text-muted-foreground">Status:</span>
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          project.is_active
+                            ? "bg-success/20 text-success-foreground"
+                            : "bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {project.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Edit Window:</span>
+                      <span className="text-sm font-medium">{project.edit_window_hours} hours</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
 
-export default ManageProjects;
+export default ProjectManagement;

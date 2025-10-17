@@ -13,3 +13,22 @@ export const registerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   profilePictureUrl: z.string().optional(),
 });
+
+// Validation middleware functions
+export const validateLogin = (req: any, res: any, next: any) => {
+  try {
+    loginSchema.parse(req.body);
+    next();
+  } catch (error: any) {
+    return res.status(400).json({ error: error.errors });
+  }
+};
+
+export const validateRegister = (req: any, res: any, next: any) => {
+  try {
+    registerSchema.parse(req.body);
+    next();
+  } catch (error: any) {
+    return res.status(400).json({ error: error.errors });
+  }
+};

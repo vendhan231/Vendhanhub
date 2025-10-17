@@ -1,7 +1,7 @@
 
-import { User, UserRole, AdminDashboardData, EmployeeDashboardData, StoredUser, BillingRecord, BillingStatus, NewManualBillingRecordData, NewCalculatedBillingRecordData, Project, DailyWorkReport, NewDailyWorkReportData, ProjectLogItemData, LeaveRequest, LeaveType, LeaveStatus, NewLeaveRequestData, ProjectBillingType, EmployeeProfileUpdateData, AttendanceRecord, UserAttendanceStatus, AdminUserUpdateData, InternalMessage, MessageRecipient, WorkReportFilters, ChangePasswordData, EmployeeProjectBillingDetail, ProjectLogItem } from '../types';
+import { User, UserRole, AdminDashboardData, EmployeeDashboardData, StoredUser, BillingRecord, BillingStatus, Project, DailyWorkReport, NewDailyWorkReportData, LeaveRequest, LeaveStatus, NewLeaveRequestData, EmployeeProfileUpdateData, AttendanceRecord, UserAttendanceStatus, AdminUserUpdateData, InternalMessage, WorkReportFilters, ChangePasswordData, ProjectLogItem } from '../types';
 import { MOCK_API_DELAY } from '../constants';
-import { calculateLeaveDays, calculateDecimalHours, formatDate } from '../utils/dateUtils';
+import { calculateDecimalHours, formatDate } from '../utils/dateUtils';
 
 // =====================================================================================
 // Mock Data Store
@@ -44,26 +44,26 @@ const mockInternalMessages: InternalMessage[] = [];
 // All localStorage-based data persistence has been removed from this file.
 // =====================================================================================
 
-const API_BASE_URL = '/api/v1'; // Example base URL for your backend
+// const API_BASE_URL = '/api/v1'; // Example base URL for your backend
 
 // --- User Management Interfaces (kept for consistency with AuthContext) ---
 export interface ParsedLoginCredentials {
-    username: string;
-    password?: string;
+     username: string;
+     password?: string;
 }
 
 export interface ParsedRegisterData {
-    username: string;
-    email: string;
-    password?: string;
-    role: UserRole;
-    firstName: string;
-    lastName: string;
-    profilePictureUrl?: string | null;
+     username: string;
+     email: string;
+     password?: string;
+     role: UserRole;
+     firstName: string;
+     lastName: string;
+     profilePictureUrl?: string | null;
 }
 
 // --- Helper to get the auth token ---
-const getAuthToken = (): string | null => localStorage.getItem('authToken');
+// const getAuthToken = (): string | null => localStorage.getItem('authToken');
 
 // --- Helper to convert StoredUser to User ---
 const stripPassword = (storedUser: StoredUser): User => {
@@ -139,20 +139,36 @@ export const apiFetchUserById = async (userId: string): Promise<User | undefined
 export const apiUpdateUserProfile = async (userId: string, updates: EmployeeProfileUpdateData): Promise<User> => {
   console.warn(`apiUpdateUserProfile (${userId}): Called with mock data store.`);
   await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-  
+
   const userIndex = mockUserDatabase.findIndex(u => u.id === userId);
   if (userIndex === -1) {
     return Promise.reject(new Error("User not found for profile update."));
   }
-  
-  const updatedStoredUser: StoredUser = { 
-      ...mockUserDatabase[userIndex], 
-      ...updates 
+
+  const updatedStoredUser: StoredUser = {
+      ...mockUserDatabase[userIndex],
+      ...updates
   };
   mockUserDatabase[userIndex] = updatedStoredUser;
-  
+
   console.log("Mock DB: Updated user profile", updatedStoredUser);
   return Promise.resolve(stripPassword(updatedStoredUser));
+};
+
+export const apiUploadProfilePicture = async (userId: string, file: File): Promise<{ profilePictureUrl: string }> => {
+  console.warn(`apiUploadProfilePicture (${userId}): Called with mock data store.`);
+  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+
+  // Mock implementation - in real app this would upload to server/cloud storage
+  const mockUrl = `/uploads/profile-pictures/${userId}-profile${file.name.substring(file.name.lastIndexOf('.'))}`;
+
+  // Update the user's profile picture URL in mock database
+  const userIndex = mockUserDatabase.findIndex(u => u.id === userId);
+  if (userIndex !== -1) {
+    mockUserDatabase[userIndex].profilePictureUrl = mockUrl;
+  }
+
+  return Promise.resolve({ profilePictureUrl: mockUrl });
 };
 
 export const apiAdminUpdateUser = async (userId: string, updates: AdminUserUpdateData): Promise<User> => {
@@ -621,21 +637,21 @@ export const apiGetUnreadMessageCount = async (userId: string): Promise<number> 
 };
 
 // --- Report API Functions ---
-export const apiSubmitReport = async (reportData: { projectId: string; reportData: any; items: any[] }): Promise<{ billingAmount: number }> => {
+export const apiSubmitReport = async (): Promise<{ billingAmount: number }> => {
   console.warn("apiSubmitReport: Called with mock data store.");
   await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
   // Mock implementation - in real backend this would create report and billing
   return Promise.resolve({ billingAmount: Math.random() * 1000 });
 };
 
-export const apiCheckDuplicateObjectIds = async (objectIds: string[], projectId: string): Promise<any[]> => {
+export const apiCheckDuplicateObjectIds = async (): Promise<any[]> => {
   console.warn("apiCheckDuplicateObjectIds: Called with mock data store.");
   await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
   // Mock implementation - return some fake duplicates
   return Promise.resolve([]);
 };
 
-export const apiExtractFields = async (formData: FormData): Promise<{ extractedData: { reportData: any; items: any[] }; rawData: any[] }> => {
+export const apiExtractFields = async (): Promise<{ extractedData: { reportData: any; items: any[] }; rawData: any[] }> => {
   console.warn("apiExtractFields: Called with mock data store.");
   await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
   // Mock implementation - return fake extracted data

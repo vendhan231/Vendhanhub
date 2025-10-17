@@ -1,83 +1,85 @@
-# Employee Management & Billing System
+# Employee Management Billing Backend
 
-## Overview
-This project is an Employee Management and Billing System designed to streamline the management of employees, projects, attendance, billing records, and internal messaging. It provides a robust backend built with Node.js, Express.js, and TypeScript, utilizing PostgreSQL as the database.
+## Database Configuration
 
-## Technology Stack
-- **Backend Framework**: Node.js with Express.js
-- **TypeScript**: For type safety and better development experience
-- **Database**: PostgreSQL
-- **ORM**: Prisma
-- **Authentication**: JSON Web Tokens (JWT)
-- **Password Hashing**: bcrypt.js
-- **Input Validation**: Zod
-- **File Uploads**: Multer
-- **CORS**: cors middleware
-- **Environment Variables**: dotenv
+This application supports both local SQLite and server-based databases.
 
-## Project Structure
-```
-employee-management-billing-backend
-├── prisma
-│   ├── schema.prisma
-│   └── migrations
-├── src
-│   ├── api
-│   │   ├── routes
-│   │   ├── controllers
-│   │   ├── services
-│   │   ├── middleware
-│   │   └── validators
-│   ├── config
-│   ├── utils
-│   └── server.ts
-├── .env
-├── .env.example
-├── package.json
-└── tsconfig.json
-```
+### Local SQLite (Default)
+The application uses SQLite by default for easy setup and development.
 
-## Features
-- **User Management**: Create, read, update, and delete user profiles.
-- **Project Management**: Manage projects with billing types and rates.
-- **Daily Work Reports**: Employees can submit daily work reports.
-- **Leave Requests**: Employees can request leaves and manage their status.
-- **Attendance Tracking**: Clock in and clock out functionality for attendance management.
-- **Billing Records**: Manage billing records and import data from CSV files.
-- **Billing Calculator**: Calculate and finalize billing periods for employees.
-- **Internal Messaging**: Send and receive messages within the application.
-- **AI Integration**: Interact with the Gemini AI service for content generation.
+### Server Database Setup
 
-## Getting Started
-1. **Clone the repository**:
-   ```
-   git clone <repository-url>
-   cd employee-management-billing-backend
+To use a server-based database (PostgreSQL, MySQL, SQL Server), follow these steps:
+
+1. **Install Database Server**
+   - PostgreSQL: `sudo apt install postgresql postgresql-contrib`
+   - MySQL: `sudo apt install mysql-server`
+   - SQL Server: Follow Microsoft's installation guide
+
+2. **Create Database**
+   ```sql
+   -- PostgreSQL
+   CREATE DATABASE employee_billing;
+   CREATE USER billing_user WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE employee_billing TO billing_user;
+
+   -- MySQL
+   CREATE DATABASE employee_billing;
+   CREATE USER 'billing_user'@'localhost' IDENTIFIED BY 'your_password';
+   GRANT ALL PRIVILEGES ON employee_billing.* TO 'billing_user'@'localhost';
    ```
 
-2. **Install dependencies**:
-   ```
-   npm install
+3. **Configure Environment Variables**
+   Edit `.env` file:
+   ```env
+   USE_SERVER_DB=true
+   SERVER_DB_URL="postgresql://billing_user:your_password@localhost:5432/employee_billing"
+   # Or for MySQL:
+   # SERVER_DB_URL="mysql://billing_user:your_password@localhost:3306/employee_billing"
+   # Or for SQL Server:
+   # SERVER_DB_URL="sqlserver://localhost:1433;database=employee_billing;username=billing_user;password=your_password"
    ```
 
-3. **Set up the database**:
-   - Create a PostgreSQL database and update the `.env` file with the database connection string.
-
-4. **Run migrations**:
+4. **Update Prisma Schema**
+   Change the datasource in `prisma/schema.prisma`:
+   ```prisma
+   datasource db {
+     provider = "postgresql"  // or "mysql" or "sqlserver"
+     url      = env("DATABASE_URL")
+   }
    ```
+
+5. **Run Migrations**
+   ```bash
    npx prisma migrate dev
+   npx prisma generate
    ```
 
-5. **Start the server**:
-   ```
+6. **Start Server**
+   ```bash
    npm run dev
    ```
 
-## API Documentation
-Refer to the individual route files in the `src/api/routes` directory for detailed API endpoints and their usage.
+The server will log which database type is being used on startup.
 
-## Contributing
-Contributions are welcome! Please open an issue or submit a pull request for any enhancements or bug fixes.
+## LAN Access
 
-## License
-This project is licensed under the MIT License.
+The server is configured to bind to all network interfaces, making it accessible from other devices on the LAN.
+
+- **Server IP**: 192.168.29.106
+- **Port**: 3000
+- **Access URL**: http://192.168.29.106:3000
+
+## Real-time Updates
+
+The application uses Socket.IO for real-time data synchronization across all connected clients.
+
+## Features
+
+- User authentication and authorization
+- Project management with dynamic fields
+- Work report submission with Excel/CSV upload
+- Billing calculation with custom formulas
+- Real-time notifications
+- LAN accessibility
+- Database flexibility (SQLite or server-based)

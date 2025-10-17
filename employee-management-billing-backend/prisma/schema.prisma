@@ -19,7 +19,7 @@ model User {
   role                    String      @default("USER")
   firstName               String
   lastName                String
-  profilePictureUrl       String?
+  profilePictureUrl       String    @default("/default-avatar.png")
   phone                   String?
   department              String?
   joinDate                DateTime

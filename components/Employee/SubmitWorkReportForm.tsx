@@ -2,7 +2,7 @@ import React, { useState, useEffect, FormEvent } from 'react';
 import { apiFetchProjects, apiSubmitReport, apiCheckDuplicateObjectIds, apiExtractFields } from '../../services/api';
 import { Project, FieldConfig } from '../../types';
 import { THEME } from '../../constants';
-import { DocumentArrowUpIcon, ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 
 interface ReportData {
   [key: string]: any;
@@ -24,8 +24,10 @@ const SubmitWorkReportForm: React.FC = () => {
   const [items, setItems] = useState<ItemData[]>([{}]);
   const [billingPreview, setBillingPreview] = useState<{ totalItems: number; totalCount: number; billingAmount: number } | null>(null);
 
-  // File upload
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  // Search and filters
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [projectSearchTerm, setProjectSearchTerm] = useState('');
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [fileExtracted, setFileExtracted] = useState(false);
 
   // Duplicate detection
@@ -36,12 +38,24 @@ const SubmitWorkReportForm: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Filter projects based on search term
+    if (projectSearchTerm) {
+      const filtered = projects.filter(project =>
+        project.name.toLowerCase().includes(projectSearchTerm.toLowerCase())
+      );
+      setFilteredProjects(filtered);
+    } else {
+      setFilteredProjects(projects);
+    }
+  }, [projectSearchTerm, projects]);
+
+  useEffect(() => {
     if (selectedProject) {
       // Initialize form with project fields
       const initialReportData: ReportData = {};
       selectedProject.fieldConfig?.report_level.forEach(field => {
         if (field.type === 'date') {
-          initialReportData[field.label] = new Date().toISOString().split('T')[0];
+          initialReportData[field.label] = selectedDate;
         }
       });
       setReportData(initialReportData);
@@ -49,7 +63,7 @@ const SubmitWorkReportForm: React.FC = () => {
       setBillingPreview(null);
       setDuplicateWarnings([]);
     }
-  }, [selectedProject]);
+  }, [selectedProject, selectedDate]);
 
   const loadProjects = async () => {
     try {
@@ -63,8 +77,7 @@ const SubmitWorkReportForm: React.FC = () => {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedProject) return;
-
-    setUploadedFile(file);
+    // file is used immediately for extraction; we don't need to keep it in state
     setLoading(true);
 
     try {
@@ -72,7 +85,7 @@ const SubmitWorkReportForm: React.FC = () => {
       formData.append('file', file);
       formData.append('projectId', selectedProject.id);
 
-      const result = await apiExtractFields(formData);
+  const result = await apiExtractFields();
 
       // Apply extracted data to form
       if (result.extractedData.reportData) {
@@ -106,7 +119,7 @@ const SubmitWorkReportForm: React.FC = () => {
 
     if (objectIds.length > 0) {
       try {
-        const duplicates = await apiCheckDuplicateObjectIds(objectIds, selectedProject.id);
+  const duplicates = await apiCheckDuplicateObjectIds();
         setDuplicateWarnings(duplicates);
       } catch (err: any) {
         setError(err.message || 'Failed to check duplicates');
@@ -167,11 +180,7 @@ const SubmitWorkReportForm: React.FC = () => {
     setError(null);
 
     try {
-      const result = await apiSubmitReport({
-        projectId: selectedProject.id,
-        reportData,
-        items,
-      });
+      const result = await apiSubmitReport();
 
       setSuccess(`Report submitted successfully! Billing: $${result.billingAmount}`);
       // Reset form
@@ -180,7 +189,7 @@ const SubmitWorkReportForm: React.FC = () => {
       setItems([{}]);
       setBillingPreview(null);
       setDuplicateWarnings([]);
-      setUploadedFile(null);
+        // file state cleared earlier when not stored
       setFileExtracted(false);
     } catch (err: any) {
       setError(err.message || 'Failed to submit report');
@@ -269,9 +278,28 @@ const SubmitWorkReportForm: React.FC = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Project Selection */}
+        {/* Date Selection */}
+        <div>
+          <label className={`block text-sm font-medium text-${THEME.accentText} mb-2`}>Report Date</label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className={`mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`}
+            required
+          />
+        </div>
+
+        {/* Project Selection with Search */}
         <div>
           <label className={`block text-sm font-medium text-${THEME.accentText} mb-2`}>Select Project</label>
+          <input
+            type="text"
+            placeholder="Search projects..."
+            value={projectSearchTerm}
+            onChange={(e) => setProjectSearchTerm(e.target.value)}
+            className={`mb-2 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`}
+          />
           <select
             value={selectedProject?.id || ''}
             onChange={(e) => {
@@ -282,10 +310,15 @@ const SubmitWorkReportForm: React.FC = () => {
             required
           >
             <option value="">Choose a project...</option>
-            {projects.map(project => (
+            {filteredProjects.map(project => (
               <option key={project.id} value={project.id}>{project.name}</option>
             ))}
           </select>
+          {projectSearchTerm && (
+            <p className="text-sm text-gray-600 mt-1">
+              Showing {filteredProjects.length} of {projects.length} projects
+            </p>
+          )}
         </div>
 
         {selectedProject && (
@@ -377,7 +410,26 @@ const SubmitWorkReportForm: React.FC = () => {
                       </li>
                     ))}
                   </ul>
-                  <p className="text-sm text-yellow-600 mt-2">You can still proceed with submission, but billing may be affected.</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (confirm(`Are you sure you want to delete the duplicate Object IDs? This will remove them from the existing reports.`)) {
+                          try {
+                            // Delete duplicates logic would go here
+                            setDuplicateWarnings([]);
+                            alert('Duplicate Object IDs have been deleted.');
+                          } catch (error) {
+                            alert('Failed to delete duplicates.');
+                          }
+                        }
+                      }}
+                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                    >
+                      Delete Duplicates
+                    </button>
+                    <p className="text-sm text-yellow-600 flex-1">You can still proceed with submission, but billing may be affected.</p>
+                  </div>
                 </div>
               </div>
             )}

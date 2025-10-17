@@ -1,10 +1,10 @@
 import React, { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { apiUpdateUserProfile } from '../../services/api';
-import { User, EmployeeProfileUpdateData } from '../../types';
+import { apiUpdateUserProfile, apiUploadProfilePicture } from '../../services/api';
+import { EmployeeProfileUpdateData } from '../../types';
 import { THEME } from '../../constants';
-import { PencilSquareIcon, CheckCircleIcon, XCircleIcon, UserCircleIcon, PhoneIcon, EnvelopeIcon, BriefcaseIcon, CalendarDaysIcon, PhotoIcon } from '@heroicons/react/24/outline';
-import ImageUpload from '../Common/ImageUpload'; // Import ImageUpload
+import { PencilSquareIcon, CheckCircleIcon, XCircleIcon, UserCircleIcon, PhoneIcon, EnvelopeIcon, BriefcaseIcon, CalendarDaysIcon } from '@heroicons/react/24/outline';
+import { ImageUpload } from '../ui/image-upload';
 
 const EmployeeProfile: React.FC = () => {
   const { user, updateUserInContext } = useAuth();
@@ -15,6 +15,7 @@ const EmployeeProfile: React.FC = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null | undefined>(user?.profilePictureUrl);
+  const [profilePictureFile, setProfilePictureFile] = useState<File | null>(null);
   
   const username = user?.username || 'N/A';
   const department = user?.department || 'N/A';
@@ -47,8 +48,17 @@ const EmployeeProfile: React.FC = () => {
     setIsEditing(!isEditing);
   };
 
-  const handleImageSelected = (base64Image: string | null) => {
-    setProfilePictureUrl(base64Image);
+  const handleImageSelected = (file: File | null) => {
+    setProfilePictureFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfilePictureUrl(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setProfilePictureUrl(user?.profilePictureUrl);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -61,17 +71,24 @@ const EmployeeProfile: React.FC = () => {
     setSuccessMessage(null);
     setLoading(true);
 
-    const profileUpdateData: EmployeeProfileUpdateData = {
-      firstName,
-      lastName,
-      email,
-      phone,
-      profilePictureUrl,
-    };
-
     try {
+      // First upload profile picture if a file was selected
+      let finalProfilePictureUrl = profilePictureUrl;
+      if (profilePictureFile) {
+        const uploadResult = await apiUploadProfilePicture(user.id, profilePictureFile);
+        finalProfilePictureUrl = uploadResult.profilePictureUrl;
+      }
+
+      const profileUpdateData: EmployeeProfileUpdateData = {
+        firstName,
+        lastName,
+        email,
+        phone,
+        profilePictureUrl: finalProfilePictureUrl,
+      };
+
       const updatedUser = await apiUpdateUserProfile(user.id, profileUpdateData);
-      updateUserInContext(updatedUser); 
+      updateUserInContext(updatedUser);
       setSuccessMessage("Profile updated successfully!");
       setIsEditing(false);
     } catch (err: any) {
@@ -90,7 +107,7 @@ const EmployeeProfile: React.FC = () => {
   }
 
   const ProfileAvatar: React.FC<{ size?: string }> = ({ size = "h-24 w-24" }) => {
-    if (profilePictureUrl) {
+    if (profilePictureUrl && profilePictureUrl !== '/default-avatar.png') {
       return <img src={profilePictureUrl} alt="Profile" className={`${size} rounded-full object-cover mx-auto ring-2 ring-offset-2 ring-${THEME.secondary}`} />;
     }
     return <UserCircleIcon className={`${size} text-gray-400 mx-auto`} />;
@@ -116,10 +133,10 @@ const EmployeeProfile: React.FC = () => {
         <ProfileAvatar />
         {isEditing && (
           <div className="mt-4">
-            <ImageUpload 
-              onImageSelected={handleImageSelected} 
-              currentImageUrl={profilePictureUrl}
-              label="Change Profile Picture"
+            <ImageUpload
+              value={profilePictureUrl || undefined}
+              onChange={handleImageSelected}
+              placeholder="Click to upload profile picture"
             />
           </div>
         )}

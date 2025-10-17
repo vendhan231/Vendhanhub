@@ -232,7 +232,9 @@ export interface LeaveRequest {
 export type NewLeaveRequestData = Omit<LeaveRequest, 'id' | 'status' | 'requestedAt' | 'adminNotes' | 'resolvedAt' | 'userFirstName' | 'userLastName'>;
 
 // --- Employee Profile Update Type ---
-export type EmployeeProfileUpdateData = Pick<User, 'firstName' | 'lastName' | 'email' | 'phone' | 'profilePictureUrl'>;
+export type EmployeeProfileUpdateData = Pick<User, 'firstName' | 'lastName' | 'email' | 'phone' | 'profilePictureUrl'> & {
+  profilePictureFile?: File;
+};
 
 // Admin updating user details
 export type AdminUserUpdateData = Pick<User, 'firstName' | 'lastName' | 'email' | 'phone' | 'department' | 'joinDate' | 'role' | 'profilePictureUrl'>;
