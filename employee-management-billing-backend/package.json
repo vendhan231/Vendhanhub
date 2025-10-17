@@ -1,0 +1,54 @@
+{
+  "name": "employee-management-billing-backend",
+  "version": "1.0.0",
+  "description": "A backend system for managing employees and billing records.",
+  "main": "src/server.ts",
+  "scripts": {
+    "dev": "ts-node-dev src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "prisma migrate dev",
+    "generate": "prisma generate",
+    "lint": "eslint . --ext .ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.5.0",
+    "@prisma/client": "^3.15.2",
+    "bcrypt": "^5.0.1",
+    "cors": "^2.8.5",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^10.0.0",
+    "express": "^4.17.1",
+    "jsonwebtoken": "^8.5.1",
+    "multer": "^1.4.4",
+    "pg": "^8.7.1",
+    "pino": "^7.0.0",
+    "prisma": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.8.3",
+    "xlsx": "^0.18.5",
+    "zod": "^3.11.6"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.0",
+    "@types/cors": "^2.8.10",
+    "@types/express": "^4.17.13",
+    "@types/jest": "^27.0.0",
+    "@types/jsonwebtoken": "^8.5.0",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^16.11.7",
+    "@types/pino": "^7.0.0",
+    "eslint": "^7.32.0",
+    "jest": "^27.0.0"
+  },
+  "keywords": [
+    "employee",
+    "management",
+    "billing",
+    "backend"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

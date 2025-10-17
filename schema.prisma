@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS
+enum Role {
+  ADMIN
+  EMPLOYEE
+}
+
+enum BillingType {
+  hourly
+  count_based
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  OTHER
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum BillingStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+// MODELS
+model User {
+  id                      String    @id @default(uuid())
+  username                String    @unique
+  email                   String    @unique
+  passwordHash            String
+  role                    Role      @default(EMPLOYEE)
+  firstName               String
+  lastName                String
+  profilePictureUrl       String?
+  phone                   String?
+  department              String?
+  joinDate                DateTime? @db.Date
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  dailyWorkReports        DailyWorkReport[]
+  leaveRequests           LeaveRequest[]
+  attendanceRecords       AttendanceRecord[]
+  billingRecords          BillingRecord[]
+  sentMessages            InternalMessage[] @relation("Sender")
+  billingRecordDetails    BillingRecordDetail[]
+}
+
+model Project {
+  id                      String    @id @default(uuid())
+  name                    String    @unique
+  billingType             BillingType
+  ratePerHour             Decimal?
+  countMetricLabel        String?
+  countDivisor            Int?      @default(1)
+  countMultiplier         Decimal?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  projectLogItems         ProjectLogItem[]
+  billingRecords          BillingRecord[]
+  billingRecordDetails    BillingRecordDetail[]
+}
+
+model DailyWorkReport {
+  id                String    @id @default(uuid())
+  userId            String
+  date              DateTime  @db.Date
+  submittedAt       DateTime
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectLogItems   ProjectLogItem[]
+
+  @@unique([userId, date])
+}
+
+model ProjectLogItem {
+  id                  String    @id @default(uuid())
+  dailyWorkReportId   String
+  projectId           String
+  projectName         String
+  hoursWorked         Decimal
+  description         String    @db.Text
+  achievedCount       Int?
+
+  dailyWorkReport     DailyWorkReport @relation(fields: [dailyWorkReportId], references: [id], onDelete: Cascade)
+  project             Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+}
+
+model LeaveRequest {
+  id                  String        @id @default(uuid())
+  userId              String
+  userFirstName       String
+  userLastName        String
+  leaveType           LeaveType
+  startDate           DateTime      @db.Date
+  endDate             DateTime      @db.Date
+  reason              String        @db.Text
+  status              RequestStatus @default(PENDING)
+  requestedAt         DateTime
+  adminNotes          String?       @db.Text
+  resolvedAt          DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  user                User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AttendanceRecord {
+  id            String    @id @default(uuid())
+  userId        String
+  date          DateTime  @db.Date
+  clockInTime   DateTime
+  clockOutTime  DateTime?
+  totalHours    Decimal?
+  notes         String?   @db.Text
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model BillingRecord {
+  id                       String        @id @default(uuid())
+  userId                   String
+  projectId                String
+  projectName              String?
+  clientName               String
+  hoursBilled              Decimal?
+  rateApplied              Decimal?
+  calculatedAmount         Decimal
+  date                     DateTime      @db.Date
+  status                   BillingStatus @default(PENDING)
+  notes                    String?       @db.Text
+  isCountBased             Boolean
+  achievedCountTotal       Int?
+  countMetricLabelUsed     String?
+  formulaUsed              String?
+  billingPeriodStartDate   DateTime?     @db.Date
+  billingPeriodEndDate     DateTime?     @db.Date
+  createdAt                DateTime      @default(now())
+  updatedAt                DateTime      @updatedAt
+
+  details                  Json?
+
+  user                     User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project                  Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+}
+
+model BillingRecordDetail {
+  id                           String    @id @default(uuid())
+  billingRecordId              String
+  userId                       String
+  projectId                    String
+  projectName                  String
+  totalAchievedCount           Int
+  metricLabel                  String
+  formulaApplied               String
+  calculatedAmountForProject   Decimal
+
+  billingRecord   BillingRecord   @relation(fields: [billingRecordId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+}
+
+model InternalMessage {
+  id                          String    @id @default(uuid())
+  senderId                    String?
+  senderName                  String
+  senderProfilePictureUrl     String?
+  recipientId                 String
+  content                     String    @db.Text
+  timestamp                   DateTime
+  isRead                      Boolean   @default(false)
+  relatedEntityId             String?
+  relatedEntityType           String?
+  createdAt                   DateTime  @default(now())
+
+  sender                      User?     @relation("Sender", fields: [senderId], references: [id], onDelete: SetNull)
+}

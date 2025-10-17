@@ -1,0 +1,31 @@
+/
+├── prisma/
+│   ├── schema.prisma         # Main Prisma schema file
+│   └── migrations/           # Database migration history
+├── src/
+│   ├── api/
+│   │   ├── routes/           # Express routers for each entity
+│   │   │   ├── auth.routes.ts
+│   │   │   ├── user.routes.ts
+│   │   │   └── ... (etc.)
+│   │   ├── controllers/      # Logic to handle requests and send responses
+│   │   │   ├── auth.controller.ts
+│   │   │   └── ...
+│   │   ├── services/         # Business logic, DB interactions, external API calls
+│   │   │   ├── user.service.ts
+│   │   │   ├── billing.service.ts
+│   │   │   └── gemini.service.ts
+│   │   ├── middleware/
+│   │   │   ├── auth.middleware.ts  # JWT verification, role checks
+│   │   │   ├── validation.middleware.ts # Zod validation
+│   │   │   └── error.middleware.ts # Global error handler
+│   │   └── validators/       # Zod schemas for validation
+│   │       ├── auth.validators.ts
+│   │       └── ...
+│   ├── config/               # Environment variable config
+│   ├── utils/                # Helper functions (e.g., image upload utility)
+│   └── server.ts             # Main application entry point
+├── .env                      # Environment variables (DB_URL, JWT_SECRET, GEMINI_API_KEY)
+├── .env.example
+├── package.json
+└── tsconfig.json
