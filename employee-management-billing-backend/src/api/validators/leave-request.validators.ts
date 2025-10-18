@@ -12,3 +12,11 @@ export const leaveRequestSchema = z.object({
 export const cancelLeaveRequestSchema = z.object({
   requestId: z.string().uuid(),
 });
+
+export const validateLeaveRequest = (data: any) => {
+  return leaveRequestSchema.parse(data);
+};
+
+export const validateCancelLeaveRequest = (data: any) => {
+  return cancelLeaveRequestSchema.parse(data);
+};

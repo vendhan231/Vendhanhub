@@ -15,3 +15,12 @@ export const getMessagesSchema = z.object({
   limit: z.number().optional().default(50),
   offset: z.number().optional().default(0),
 });
+
+export const InternalMessage = z.object({
+  id: z.string(),
+  senderId: z.string(),
+  recipientId: z.string(),
+  content: z.string(),
+  sentAt: z.date(),
+  readAt: z.date().optional(),
+});

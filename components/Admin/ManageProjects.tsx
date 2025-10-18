@@ -62,7 +62,8 @@ const ProjectManagement = () => {
         }
       });
 
-      const result = eval(formula);
+      // Use Function constructor instead of eval for better security
+      const result = new Function('return ' + formula)();
       setCalculatedTest(Number(result) || 0);
       toast.success(`Formula test: Rs. ${Number(result).toFixed(2)}`);
     } catch (e) {
@@ -148,17 +149,24 @@ const ProjectManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
+    <div className="space-y-6 animate-fade-in">
+      <Card className="glass-card shadow-soft">
+        <CardHeader className="pb-6">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Project Management</CardTitle>
-              <CardDescription>Create and manage projects with dynamic fields and billing formulas</CardDescription>
+              <CardTitle className="flex items-center gap-3 text-2xl font-bold text-foreground">
+                <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+                  <FolderPlus className="w-6 h-6 text-primary" />
+                </div>
+                Project Management
+              </CardTitle>
+              <CardDescription className="text-base mt-2">
+                Create and manage projects with dynamic fields and intelligent billing formulas
+              </CardDescription>
             </div>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-gradient-primary" onClick={() => {
+                <Button className="btn-modern bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2.5 shadow-medium border border-primary/20" onClick={() => {
                   setEditingProject(null);
                   resetForm();
                 }}>
@@ -166,11 +174,16 @@ const ProjectManagement = () => {
                   Add Project
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Create New Project</DialogTitle>
-                  <DialogDescription>
-                    Configure project with custom fields and billing formula
+              <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto glass-card shadow-strong">
+                <DialogHeader className="pb-6">
+                  <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-foreground">
+                    <div className={`p-2 rounded-lg ${editingProject ? 'bg-secondary/20 border border-secondary/30' : 'bg-accent/20 border border-accent/30'}`}>
+                      {editingProject ? <Pencil className="w-6 h-6 text-secondary-foreground" /> : <FolderPlus className="w-6 h-6 text-accent-foreground" />}
+                    </div>
+                    {editingProject ? "Edit Project" : "Create New Project"}
+                  </DialogTitle>
+                  <DialogDescription className="text-base mt-2">
+                    {editingProject ? "Update project configuration and billing settings" : "Configure project with custom fields and intelligent billing formulas"}
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleCreateProject} className="space-y-6">
@@ -226,10 +239,12 @@ const ProjectManagement = () => {
                     </div>
 
                     {/* Formula Tester */}
-                    <Card className="bg-muted/50">
-                      <CardHeader>
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          <Calculator className="w-4 h-4" />
+                    <Card className="glass-card shadow-soft border-2 border-primary/20">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-lg flex items-center gap-3 font-semibold text-foreground">
+                          <div className="p-1.5 rounded-md bg-primary/10 border border-primary/20">
+                            <Calculator className="w-5 h-5 text-primary" />
+                          </div>
                           Formula Tester
                         </CardTitle>
                       </CardHeader>
@@ -252,19 +267,34 @@ const ProjectManagement = () => {
                           ))}
                         </div>
                         <div className="flex items-center justify-between">
-                          <Button type="button" variant="outline" size="sm" onClick={testFormula}>
+                          <Button
+                            type="button"
+                            className="btn-modern bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-4 py-2 shadow-soft border border-primary/20"
+                            onClick={testFormula}
+                          >
                             Calculate Test
                           </Button>
-                          <span className="text-lg font-bold text-primary">
-                            Rs. {calculatedTest.toFixed(2)}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl font-bold text-primary">₹</span>
+                            <span className="text-2xl font-bold text-primary">
+                              {calculatedTest.toFixed(2)}
+                            </span>
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
                   </div>
 
-                  <Button type="submit" className="w-full" disabled={loading}>
-                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <Button
+                    type="submit"
+                    className={`w-full h-12 text-base font-semibold btn-modern shadow-medium ${
+                      editingProject
+                        ? "bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                        : "bg-accent hover:bg-accent/90 text-accent-foreground"
+                    } border border-transparent`}
+                    disabled={loading}
+                  >
+                    {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                     {editingProject ? "Update Project" : "Create Project"}
                   </Button>
                 </form>
@@ -278,13 +308,13 @@ const ProjectManagement = () => {
               <Loader2 className="w-8 h-8 animate-spin text-primary" />
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-6">
               {projects.map((project) => (
-                <Card key={project.id} className="border-l-4 border-l-primary">
-                  <CardHeader>
+                <Card key={project.id} className="glass-card border-l-4 border-l-primary shadow-soft hover:shadow-medium transition-all duration-300 animate-slide-up">
+                  <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <CardTitle className="text-xl">{project.name}</CardTitle>
+                        <CardTitle className="text-xl font-semibold text-foreground">{project.name}</CardTitle>
                         {project.description && (
                           <CardDescription className="mt-2">
                             {project.description}
@@ -329,12 +359,12 @@ const ProjectManagement = () => {
                     </div>
 
                     <div className="flex items-center justify-between text-sm pt-2 border-t">
-                      <span className="text-muted-foreground">Status:</span>
+                      <span className="text-muted-foreground font-medium">Status:</span>
                       <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold shadow-soft ${
                           project.is_active
-                            ? "bg-success/20 text-success-foreground"
-                            : "bg-muted text-muted-foreground"
+                            ? "bg-secondary/20 text-secondary-foreground border border-secondary/30"
+                            : "bg-muted/20 text-muted-foreground border border-muted/30"
                         }`}
                       >
                         {project.is_active ? "Active" : "Inactive"}

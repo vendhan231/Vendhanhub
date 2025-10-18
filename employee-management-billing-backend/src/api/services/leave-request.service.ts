@@ -1,31 +1,22 @@
-import { PrismaClient } from '@prisma/client';
 import { LeaveRequest } from '@prisma/client';
-import { z } from 'zod';
+import config from '../../config';
 
-const prisma = new PrismaClient();
-
-// Zod schema for leave request validation
-const leaveRequestSchema = z.object({
-  userId: z.string(),
-  leaveType: z.enum(['ANNUAL', 'SICK', 'UNPAID', 'OTHER']),
-  startDate: z.date(),
-  endDate: z.date(),
-  reason: z.string().min(1),
-});
+const prisma = config.prisma;
 
 // Service to handle leave request operations
 class LeaveRequestService {
-  async createLeaveRequest(data: LeaveRequest) {
-    const validatedData = leaveRequestSchema.parse(data);
+  async createLeaveRequest(data: any) {
     return await prisma.leaveRequest.create({
       data: {
-        userId: validatedData.userId,
-        leaveType: validatedData.leaveType,
-        startDate: validatedData.startDate,
-        endDate: validatedData.endDate,
-        reason: validatedData.reason,
+        userId: data.userId,
+        leaveType: data.leaveType,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        reason: data.reason,
         status: 'PENDING',
-        requestedAt: new Date(),
+        requestedAt: data.requestedAt || new Date(),
+        userFirstName: data.userFirstName,
+        userLastName: data.userLastName,
       },
     });
   }

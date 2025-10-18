@@ -12,6 +12,10 @@ export const createWorkReportSchema = z.object({
   })).nonempty(),
 });
 
+export const validateWorkReport = (data: any) => {
+ return createWorkReportSchema.parse(data);
+};
+
 export const updateWorkReportSchema = z.object({
   date: z.string().refine((date) => !isNaN(Date.parse(date)), {
     message: "Invalid date format",

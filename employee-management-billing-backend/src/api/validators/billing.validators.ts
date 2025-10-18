@@ -51,3 +51,15 @@ export const importBillingRecordsSchema = z.array(z.object({
   billingPeriodStartDate: z.date().optional(),
   billingPeriodEndDate: z.date().optional(),
 }));
+
+export const validateBillingRecord = (data: any) => {
+  return createBillingRecordSchema.parse(data);
+};
+
+export const importCSVValidator = (data: any) => {
+  return importBillingRecordsSchema.parse(data);
+};
+
+export const billingRecordValidator = (data: any) => {
+  return createBillingRecordSchema.parse(data);
+};

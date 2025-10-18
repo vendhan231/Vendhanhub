@@ -12,9 +12,11 @@ cloudinary.config({
 // Set up Cloudinary storage
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
-  params: {
-    folder: 'profile_pictures', // Folder name in Cloudinary
-    allowed_formats: ['jpg', 'png', 'jpeg'], // Allowed formats
+  params: async () => {
+    return {
+      folder: 'profile_pictures', // Folder name in Cloudinary
+      allowed_formats: ['jpg', 'png', 'jpeg'], // Allowed formats
+    };
   },
 });
 

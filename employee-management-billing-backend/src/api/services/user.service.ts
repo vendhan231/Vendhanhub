@@ -1,19 +1,19 @@
-import { PrismaClient } from '@prisma/client';
 import { User } from '@prisma/client';
 import { hash } from 'bcrypt';
 import { UserCreateInput, UserUpdateInput } from '../validators/user.validators';
+import config from '../../config';
 
-const prisma = new PrismaClient();
+const prisma = config.prisma;
 
 export const userService = {
-  createUser: async (data: UserCreateInput): Promise<User> => {
+  createUser: async (data: any): Promise<User> => {
     const passwordHash = await hash(data.password, 10);
     return await prisma.user.create({
       data: {
         ...data,
         passwordHash,
       },
-    });
+    } as any);
   },
 
   getUserById: async (id: string): Promise<User | null> => {
@@ -22,7 +22,7 @@ export const userService = {
     });
   },
 
-  updateUser: async (id: string, data: UserUpdateInput): Promise<User> => {
+  updateUser: async (id: string, data: any): Promise<User> => {
     return await prisma.user.update({
       where: { id },
       data,

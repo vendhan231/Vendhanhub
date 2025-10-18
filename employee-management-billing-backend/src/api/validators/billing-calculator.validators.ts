@@ -24,3 +24,11 @@ export const finalizeBillingSchema = z.object({
     message: "Billing records cannot be empty",
   }),
 });
+
+export const calculateBillingValidator = (data: any) => {
+  return calculateBillingSchema.parse(data);
+};
+
+export const finalizeBillingValidator = (data: any) => {
+  return finalizeBillingSchema.parse(data);
+};

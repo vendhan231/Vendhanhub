@@ -37,3 +37,11 @@ export const updateProjectSchema = z.object({
 export const projectIdSchema = z.object({
   projectId: z.string().uuid('Invalid project ID format'),
 });
+
+export const createProjectValidator = (data: any) => {
+  return createProjectSchema.parse(data);
+};
+
+export const updateProjectValidator = (data: any) => {
+  return updateProjectSchema.parse(data);
+};

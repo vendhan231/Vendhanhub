@@ -11,7 +11,7 @@ const attendanceSchema = z.object({
   clockInTime: z.string().refine((time) => !isNaN(Date.parse(time)), {
     message: "Invalid clock-in time format",
   }),
-  clockOutTime: z.string().optional().refine((time) => !isNaN(Date.parse(time)), {
+  clockOutTime: z.string().optional().refine((time) => time === undefined || !isNaN(Date.parse(time)), {
     message: "Invalid clock-out time format",
   }),
   notes: z.string().optional(),
@@ -77,3 +77,23 @@ export const getAttendanceStatus = async (userId: string) => {
 
   return attendanceRecord ? { status: 'Clocked In', record: attendanceRecord } : { status: 'Clocked Out' };
 };
+
+export class AttendanceService {
+  async clockIn(userId: string) {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    return await clockIn(userId, today, now);
+  }
+
+  async clockOut(userId: string) {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date().toISOString();
+    return await clockOut(userId, today, now);
+  }
+
+  async getStatus(userId: string) {
+    return await getAttendanceStatus(userId);
+  }
+}
+
+export const attendanceService = new AttendanceService();

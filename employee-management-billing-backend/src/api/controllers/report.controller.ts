@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express-serve-static-core';
 import * as reportService from '../services/report.service';
 import * as reportValidators from '../validators/report.validators';
 import { ZodError } from 'zod';

@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import config from '../../config';
 
-const prisma = new PrismaClient();
+const prisma = config.prisma;
 
 // Helper function to evaluate custom billing formula
 const evaluateFormula = (formula: string, fieldValues: Record<string, any>): number => {
