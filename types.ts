@@ -29,7 +29,7 @@ export interface AdminDashboardData {
   activeUsers: number;
   presentToday: number; 
   absentToday: number;  
-  ongoingProjects: Pick<Project, 'id' | 'name'>[]; 
+  projects: Project[]; 
 }
 
 export interface EmployeeDashboardData {
@@ -38,6 +38,7 @@ export interface EmployeeDashboardData {
     department?: string;
     joinDate?: string;
   };
+  projects?: Project[];
   quickActions: string[];
 }
 
@@ -171,6 +172,10 @@ export interface ProjectLogItem {
   hoursWorked: number; 
   description: string;
   achievedCount?: number; 
+  customFields?: Record<string, any>;
+  billing?: {
+    calculatedPay: number;
+  };
 }
 
 export interface DailyWorkReport {

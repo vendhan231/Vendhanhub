@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { apiSubmitDailyWorkReport } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,13 +39,18 @@ interface ProjectField {
   required: boolean;
 }
 
+interface ObjectData {
+  id: string;
+  objectId: string;
+  customFields: Record<string, any>;
+}
+
 interface WorkReportData {
   projectId: string;
   date: string;
   hoursWorked?: number;
   description: string;
-  objectId: string;
-  customFields: Record<string, any>;
+  objects: ObjectData[];
   fileData?: any[];
 }
 
@@ -56,6 +63,7 @@ interface ProcessedFileData {
 }
 
 const SubmitWorkReportForm = () => {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -68,8 +76,7 @@ const SubmitWorkReportForm = () => {
     date: new Date().toISOString().split('T')[0],
     hoursWorked: 0,
     description: "",
-    objectId: "",
-    customFields: {},
+    objects: [{ id: `item-${Date.now()}`, objectId: "", customFields: {} }],
   });
 
   // File processing
@@ -129,6 +136,50 @@ const SubmitWorkReportForm = () => {
     }
   };
 
+  const addObject = () => {
+    setFormData(prev => ({
+      ...prev,
+      objects: [
+        ...prev.objects,
+        { id: `item-${Date.now()}`, objectId: "", customFields: {} }
+      ]
+    }));
+  };
+
+  const removeObject = (id: string) => {
+    if (formData.objects.length <= 1) {
+      toast.error("You must have at least one object.");
+      return;
+    }
+    setFormData(prev => ({
+      ...prev,
+      objects: prev.objects.filter(obj => obj.id !== id)
+    }));
+  };
+
+  const handleObjectChange = (id: string, field: 'objectId' | 'customFields', value: any, customFieldLabel?: string) => {
+    setFormData(prev => ({
+      ...prev,
+      objects: prev.objects.map(obj => {
+        if (obj.id === id) {
+          if (field === 'objectId') {
+            return { ...obj, objectId: value };
+          }
+          if (field === 'customFields' && customFieldLabel) {
+            return {
+              ...obj,
+              customFields: {
+                ...obj.customFields,
+                [customFieldLabel]: value
+              }
+            };
+          }
+        }
+        return obj;
+      })
+    }));
+  };
+
   // Handle project selection
   const handleProjectSelect = (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
@@ -136,7 +187,7 @@ const SubmitWorkReportForm = () => {
     setFormData(prev => ({
       ...prev,
       projectId,
-      customFields: {},
+      objects: [{ id: `item-${Date.now()}`, objectId: "", customFields: {} }],
       hoursWorked: project?.billingType === 'hourly' ? prev.hoursWorked : undefined,
     }));
   };
@@ -194,8 +245,21 @@ const SubmitWorkReportForm = () => {
 
   // Handle duplicate resolution
   const handleDuplicateResolution = (action: 'delete' | 'keep') => {
-    setDuplicateWarning(prev => ({ ...prev, action }));
-    toast.success(`Duplicates ${action === 'delete' ? 'marked for deletion' : 'kept'}`);
+    if (action === 'delete') {
+      // Remove all duplicate Object_IDs from processedData
+      setProcessedData(prev => prev.map(file => ({
+        ...file,
+        extractedFields: file.extractedFields.filter((row, idx, arr) =>
+          arr.findIndex(r => r.Object_ID === row.Object_ID) === idx
+        ),
+        objectIds: Array.from(new Set(file.objectIds.filter((id, idx, arr) => arr.indexOf(id) === idx)))
+      })));
+      setDuplicateWarning({ show: false, duplicates: [] });
+      toast.success('Duplicates deleted');
+    } else {
+      setDuplicateWarning(prev => ({ ...prev, action }));
+      toast.success('Duplicates kept');
+    }
   };
 
   // Calculate billing
@@ -203,24 +267,25 @@ const SubmitWorkReportForm = () => {
     if (!selectedProject) return;
 
     try {
-      let formula = selectedProject.billing_formula;
-      const testValues: Record<string, number> = {};
-
-      // Replace field names in formula with values
-      selectedProject.item_fields.forEach(field => {
-        if (field.type === 'number') {
-          const value = formData.customFields[field.label] || 0;
-          testValues[field.label] = Number(value);
-          formula = formula.replace(new RegExp(field.label, 'g'), value.toString());
-        }
+      let totalBilling = 0;
+      formData.objects.forEach(object => {
+        let formula = selectedProject.billing_formula;
+        
+        selectedProject.item_fields.forEach(field => {
+          if (field.type === 'number') {
+            const value = object.customFields[field.label] || 0;
+            formula = formula.replace(new RegExp(field.label, 'g'), value.toString());
+          }
+        });
+        
+        const result = new Function('return ' + formula)();
+        totalBilling += Number(result) || 0;
       });
 
-      // Use Function constructor for safety
-      const result = new Function('return ' + formula)();
-      setCalculationResult(Number(result) || 0);
-      toast.success(`Calculated: ₹${Number(result).toFixed(2)}`);
+      setCalculationResult(totalBilling);
+      toast.success(`Calculated Total: ₹${totalBilling.toFixed(2)}`);
     } catch (error) {
-      toast.error("Invalid formula or missing values");
+      toast.error("Invalid formula or missing values in one of the objects");
       setCalculationResult(0);
     }
   };
@@ -237,26 +302,53 @@ const SubmitWorkReportForm = () => {
     setSubmitting(true);
 
     try {
-      // Mock submission - replace with API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      if (!user) throw new Error("User not authenticated");
+      // Prepare projectLogs from both manually entered objects and processed file data
+      const manualLogs = formData.objects
+        .filter(obj => obj.objectId) // only include objects with an ID
+        .map(obj => {
+          return {
+            id: obj.objectId,
+            projectId: formData.projectId,
+            projectName: selectedProject?.name || '',
+            hoursWorked: formData.hoursWorked || 0,
+            description: formData.description || '',
+            achievedCount: obj.customFields[selectedProject.countMetricLabel || ''] || undefined,
+            customFields: obj.customFields,
+          };
+        });
 
+      const fileLogs = processedData.flatMap(file => file.extractedFields.map(row => ({
+        id: row.Object_ID || row.id || Math.random().toString(36),
+        projectId: formData.projectId,
+        projectName: selectedProject?.name || '',
+        hoursWorked: row.HoursWorked || 0,
+        description: row.Description || '',
+        achievedCount: row.CharacterCount || row.RecordCount || undefined,
+        customFields: row,
+      })));
+
+      const projectLogs = [...manualLogs, ...fileLogs];
+      const reportData = {
+        userId: user.id,
+        date: formData.date,
+        projectLogs,
+      };
+      await apiSubmitDailyWorkReport(reportData);
       toast.success("Work report submitted successfully!");
-
-      // Reset form
       setFormData({
         projectId: "",
         date: new Date().toISOString().split('T')[0],
         description: "",
-        objectId: "",
-        customFields: {},
+        objects: [{ id: `item-${Date.now()}`, objectId: "", customFields: {} }],
       });
       setSelectedProject(null);
       setUploadedFiles([]);
       setProcessedData([]);
       setCalculationResult(0);
-
     } catch (error) {
-      toast.error("Failed to submit work report");
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      toast.error(errorMessage || "Failed to submit work report");
     } finally {
       setSubmitting(false);
     }
@@ -317,80 +409,95 @@ const SubmitWorkReportForm = () => {
             {/* Dynamic Fields Based on Project */}
             {selectedProject && (
               <div className="space-y-4 p-4 border-2 border-primary/20 rounded-lg bg-primary/5">
+                {selectedProject.billingType === 'hourly' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="hoursWorked">Hours Worked *</Label>
+                    <Input
+                      id="hoursWorked"
+                      type="number"
+                      value={formData.hoursWorked || ''}
+                      onChange={(e) => setFormData(prev => ({ ...prev, hoursWorked: Number(e.target.value) }))}
+                      placeholder="Enter hours worked"
+                      className="h-12"
+                      required
+                    />
+                  </div>
+                )}
                 <h3 className="text-lg font-semibold text-primary">Project Fields</h3>
 
-                {/* Object ID Field */}
-                <div className="space-y-2">
-                  <Label htmlFor="objectId">Object ID *</Label>
-                  <Input
-                    id="objectId"
-                    value={formData.objectId}
-                    onChange={(e) => setFormData(prev => ({ ...prev, objectId: e.target.value }))}
-                    placeholder="Enter unique object identifier"
-                    className="h-12"
-                    required
-                  />
-                </div>
-
-                {/* Dynamic Project Fields */}
-                {selectedProject.item_fields
-                  .filter(field => field.label !== 'Object_ID')
-                  .map(field => (
-                    <div key={field.id} className="space-y-2">
-                      <Label htmlFor={field.label}>
-                        {field.label} {field.required && '*'}
-                      </Label>
-                      {field.type === 'number' && (
-                        <Input
-                          id={field.label}
-                          type="number"
-                          value={formData.customFields[field.label] || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            customFields: {
-                              ...prev.customFields,
-                              [field.label]: Number(e.target.value)
-                            }
-                          }))}
-                          placeholder={`Enter ${field.label.toLowerCase()}`}
-                          className="h-12"
-                          required={field.required}
-                        />
-                      )}
-                      {field.type === 'text' && (
-                        <Input
-                          id={field.label}
-                          value={formData.customFields[field.label] || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            customFields: {
-                              ...prev.customFields,
-                              [field.label]: e.target.value
-                            }
-                          }))}
-                          placeholder={`Enter ${field.label.toLowerCase()}`}
-                          className="h-12"
-                          required={field.required}
-                        />
-                      )}
-                      {field.type === 'textarea' && (
-                        <Textarea
-                          id={field.label}
-                          value={formData.customFields[field.label] || ''}
-                          onChange={(e) => setFormData(prev => ({
-                            ...prev,
-                            customFields: {
-                              ...prev.customFields,
-                              [field.label]: e.target.value
-                            }
-                          }))}
-                          placeholder={`Enter ${field.label.toLowerCase()}`}
-                          rows={3}
-                          required={field.required}
-                        />
-                      )}
+                {formData.objects.map((object) => (
+                  <div key={object.id} className="space-y-4 p-3 border rounded-md relative">
+                    {formData.objects.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={() => removeObject(object.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                    {/* Object ID Field */}
+                    <div className="space-y-2">
+                      <Label htmlFor={`objectId-${object.id}`}>Object ID *</Label>
+                      <Input
+                        id={`objectId-${object.id}`}
+                        value={object.objectId}
+                        onChange={(e) => handleObjectChange(object.id, 'objectId', e.target.value)}
+                        placeholder="Enter unique object identifier"
+                        className="h-12"
+                        required
+                      />
                     </div>
-                  ))}
+
+                    {/* Dynamic Project Fields */}
+                    {selectedProject.item_fields
+                      .filter(field => field.label !== 'Object_ID')
+                      .map(field => (
+                        <div key={field.id} className="space-y-2">
+                          <Label htmlFor={`${field.label}-${object.id}`}>
+                            {field.label} {field.required && '*'}
+                          </Label>
+                          {field.type === 'number' && (
+                            <Input
+                              id={`${field.label}-${object.id}`}
+                              type="number"
+                              value={object.customFields[field.label] || ''}
+                              onChange={(e) => handleObjectChange(object.id, 'customFields', Number(e.target.value), field.label)}
+                              placeholder={`Enter ${field.label.toLowerCase()}`}
+                              className="h-12"
+                              required={field.required}
+                            />
+                          )}
+                          {field.type === 'text' && (
+                            <Input
+                              id={`${field.label}-${object.id}`}
+                              value={object.customFields[field.label] || ''}
+                              onChange={(e) => handleObjectChange(object.id, 'customFields', e.target.value, field.label)}
+                              placeholder={`Enter ${field.label.toLowerCase()}`}
+                              className="h-12"
+                              required={field.required}
+                            />
+                          )}
+                          {field.type === 'textarea' && (
+                            <Textarea
+                              id={`${field.label}-${object.id}`}
+                              value={object.customFields[field.label] || ''}
+                              onChange={(e) => handleObjectChange(object.id, 'customFields', e.target.value, field.label)}
+                              placeholder={`Enter ${field.label.toLowerCase()}`}
+                              rows={3}
+                              required={field.required}
+                            />
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                ))}
+
+                <Button type="button" variant="outline" onClick={addObject}>
+                  Add Another Object
+                </Button>
 
                 {/* Billing Calculator */}
                 <div className="pt-4 border-t border-primary/20">

@@ -59,6 +59,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       // You can dispatch actions or update state here
     });
 
+    socketInstance.on('dashboard-update', (data) => {
+      console.log('Dashboard update:', data);
+      // You can dispatch actions or update state here
+    });
+
     setSocket(socketInstance);
 
     return () => {

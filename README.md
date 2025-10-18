@@ -49,6 +49,8 @@ A comprehensive full-stack application for managing employees, tracking work rep
 
 ### Development Setup
 
+**Note on PostgreSQL Setup:** The `scripts/setup-postgresql.bat` script now dynamically loads database credentials from the `employee-management-billing-backend/.env` file. Ensure your `.env` file is correctly configured before running the setup script.
+
 1. **Clone the repository**
    ```bash
    git clone <repository-url>

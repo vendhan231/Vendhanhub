@@ -9,7 +9,7 @@ async function main(){
   try{
     // Test the connection by running a simple query
     const userCount = await prisma.user.count();
-    console.log('✅ Connected to SQLite database successfully!');
+    console.log('✅ Connected to PostgreSQL database successfully!');
     console.log(`📊 Current user count: ${userCount}`);
 
     // Test with a simple query

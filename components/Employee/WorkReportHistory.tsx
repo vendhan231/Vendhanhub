@@ -1,52 +1,60 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '@/hooks/useAuth';
 import { apiFetchUserDailyWorkReports } from '../../services/api';
 import { DailyWorkReport } from '../../types';
 import { THEME } from '../../constants';
-import { DocumentTextIcon, CalendarIcon, ClockIcon, BeakerIcon } from '@heroicons/react/24/outline';
+import { CalendarIcon, EyeIcon } from '@heroicons/react/24/outline';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const WorkReportHistory: React.FC = () => {
+  const { user } = useAuth();
   const [reports, setReports] = useState<DailyWorkReport[]>([]);
-  const [filteredReports, setFilteredReports] = useState<DailyWorkReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [projectFilter, setProjectFilter] = useState('');
+  const [projectFilter, setProjectFilter] = useState('all');
+  const [selectedReport, setSelectedReport] = useState<DailyWorkReport | null>(null);
 
   useEffect(() => {
     loadReports();
-  }, [startDate, endDate]);
+  }, []);
 
-  useEffect(() => {
-    // Filter reports based on search term and project filter
-    let filtered = reports;
+  const filteredReports = useMemo(() => {
+    return reports.filter(report => {
+      const reportDate = new Date(report.date);
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
 
-    if (searchTerm) {
-      filtered = filtered.filter(report =>
-        report.projectLogs.some(log =>
-          log.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          log.description?.toLowerCase().includes(searchTerm.toLowerCase())
-        )
-      );
-    }
+      if (start && reportDate < start) return false;
+      if (end && reportDate > end) return false;
 
-    if (projectFilter) {
-      filtered = filtered.filter(report =>
-        report.projectLogs.some(log => log.projectName === projectFilter)
-      );
-    }
+      const matchesSearch = searchTerm
+        ? report.projectLogs.some(log =>
+            log.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.id.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+        : true;
 
-    setFilteredReports(filtered);
-  }, [reports, searchTerm, projectFilter]);
+      const matchesProject = projectFilter && projectFilter !== 'all'
+        ? report.projectLogs.some(log => log.projectName === projectFilter)
+        : true;
+
+      return matchesSearch && matchesProject;
+    });
+  }, [reports, startDate, endDate, searchTerm, projectFilter]);
 
   const loadReports = async () => {
     try {
       setLoading(true);
       setError(null);
-      const userId = 'current-user-id'; // This should come from auth context
-      const filters = startDate || endDate ? { startDate, endDate } : undefined;
-      const fetchedReports = await apiFetchUserDailyWorkReports(userId, filters);
+      if (!user) throw new Error('User not authenticated');
+      const fetchedReports = await apiFetchUserDailyWorkReports(user.id);
       setReports(fetchedReports);
     } catch (err: any) {
       setError(err.message || 'Failed to load work reports');
@@ -57,16 +65,15 @@ const WorkReportHistory: React.FC = () => {
 
   const formatCurrency = (amount?: number): string => {
     if (amount === undefined || amount === null) return 'N/A';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
-
-  const calculateTotalHours = (report: DailyWorkReport): number => {
-    return report.projectLogs.reduce((total, log) => total + log.hoursWorked, 0);
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
   };
 
   const calculateTotalBilling = (report: DailyWorkReport): number => {
-    // This is a simplified calculation - in real implementation, this would use project billing rules
-    return report.projectLogs.reduce((total, log) => total + (log.hoursWorked * 50), 0); // Assuming $50/hour rate
+    return report.projectLogs.reduce((total, log) => total + (log.billing?.calculatedPay || 0), 0);
+  };
+
+  const getTotalObjects = (report: DailyWorkReport): number => {
+    return report.projectLogs.length;
   };
 
   if (loading && reports.length === 0) {
@@ -92,51 +99,33 @@ const WorkReportHistory: React.FC = () => {
 
         {/* Search and Filters */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label htmlFor="search" className={`block text-sm font-medium text-${THEME.accentText} mb-1`}>Search</label>
-            <input
-              type="text"
-              id="search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search projects or descriptions..."
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`}
-            />
-          </div>
-          <div>
-            <label htmlFor="projectFilter" className={`block text-sm font-medium text-${THEME.accentText} mb-1`}>Project</label>
-            <select
-              id="projectFilter"
-              value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`}
-            >
-              <option value="">All Projects</option>
-              {Array.from(new Set(reports.flatMap(r => r.projectLogs.map(l => l.projectName)))).map(project => (
-                <option key={project} value={project}>{project}</option>
+          <Input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by project, description, or Object ID..."
+          />
+          <Select value={projectFilter} onValueChange={setProjectFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by project" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Projects</SelectItem>
+              {Array.from(new Set(reports.flatMap(r => r.projectLogs.map(l => l.projectName)))).filter(Boolean).map(project => (
+                <SelectItem key={project} value={project}>{project}</SelectItem>
               ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="startDate" className={`block text-sm font-medium text-${THEME.accentText} mb-1`}>From</label>
-            <input
-              type="date"
-              id="startDate"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`}
-            />
-          </div>
-          <div>
-            <label htmlFor="endDate" className={`block text-sm font-medium text-${THEME.accentText} mb-1`}>To</label>
-            <input
-              type="date"
-              id="endDate"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={`w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-${THEME.secondary} focus:border-${THEME.secondary} sm:text-sm`}
-            />
-          </div>
+            </SelectContent>
+          </Select>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
         </div>
       </div>
 
@@ -147,7 +136,7 @@ const WorkReportHistory: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {filteredReports.map(report => (
-            <div key={report.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+            <div key={report.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-all">
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center space-x-3">
                   <CalendarIcon className="h-5 w-5 text-gray-400" />
@@ -158,40 +147,13 @@ const WorkReportHistory: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-semibold text-green-600">{formatCurrency(calculateTotalBilling(report))}</div>
-                  <div className="text-sm text-gray-500">{calculateTotalHours(report).toFixed(2)} hours</div>
+                  <div className="text-sm text-gray-500">{getTotalObjects(report)} objects</div>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                {report.projectLogs.map((log, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 rounded p-3">
-                    <div className="flex items-center space-x-3">
-                      <DocumentTextIcon className="h-4 w-4 text-gray-400" />
-                      <div>
-                        <span className="font-medium">{log.projectName}</span>
-                        {log.description && (
-                          <p className="text-sm text-gray-600">{log.description}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-4 text-sm">
-                      <div className="flex items-center space-x-1">
-                        <ClockIcon className="h-4 w-4 text-gray-400" />
-                        <span>{log.hoursWorked}h</span>
-                      </div>
-                      {log.achievedCount && (
-                        <div className="flex items-center space-x-1">
-                          <BeakerIcon className="h-4 w-4 text-gray-400" />
-                          <span>{log.achievedCount}</span>
-                        </div>
-                      )}
-                      <div className="font-medium text-green-600">
-                        {formatCurrency(log.hoursWorked * 50)} {/* Simplified calculation */}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <Button variant="outline" size="sm" onClick={() => setSelectedReport(report)}>
+                <EyeIcon className="h-4 w-4 mr-2" />
+                View Details
+              </Button>
             </div>
           ))}
         </div>
@@ -209,9 +171,9 @@ const WorkReportHistory: React.FC = () => {
               </div>
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {filteredReports.reduce((total, report) => total + calculateTotalHours(report), 0).toFixed(1)}
+                  {filteredReports.reduce((total, report) => total + getTotalObjects(report), 0)}
                 </div>
-                <div className="text-sm text-gray-600">Total Hours</div>
+                <div className="text-sm text-gray-600">Total Objects</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-green-600">
@@ -223,6 +185,37 @@ const WorkReportHistory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Detailed Report Modal */}
+      <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Report Details - {selectedReport ? new Date(selectedReport.date).toLocaleDateString() : ''}</DialogTitle>
+            <DialogDescription>
+              Detailed view of all objects and fields for the selected report.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto p-4 space-y-4">
+            {selectedReport?.projectLogs.map(log => (
+              <div key={log.id} className="border rounded-lg p-4">
+                <h4 className="font-semibold text-lg mb-2">{log.projectName} - {log.id}</h4>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {Object.entries(log.customFields || {}).map(([key, value]) => (
+                    <div key={key}>
+                      <span className="font-medium text-gray-500">{key}: </span>
+                      <span>{String(value)}</span>
+                    </div>
+                  ))}
+                  <div>
+                    <span className="font-medium text-gray-500">Billing Amount: </span>
+                    <span className="font-semibold text-green-600">{formatCurrency(log.billing?.calculatedPay)}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

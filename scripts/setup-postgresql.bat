@@ -4,12 +4,33 @@ REM Run this script to set up your PostgreSQL database
 
 echo 🚀 Setting up PostgreSQL database for Employee Management System...
 
-REM Database configuration from your .env file
-set DB_HOST=localhost
-set DB_PORT=5432
-set DB_NAME=EMS
-set DB_USER=postgres
-set DB_PASSWORD=vendhan@123
+REM Parse database configuration from .env file
+set ENV_FILE_PATH=../employee-management-billing-backend/.env
+
+echo Parsing database configuration from %ENV_FILE_PATH%...
+
+IF NOT EXIST "%ENV_FILE_PATH%" (
+    echo ❌ Error: %ENV_FILE_PATH% not found.
+    pause
+    exit /b 1
+)
+
+FOR /F "tokens=1,* delims==" %%A IN ('type "%ENV_FILE_PATH%"') DO (
+    set "key=%%A"
+    set "value=%%B"
+    
+    REM Set environment variables, handling potential comments
+    if "!key:~0,1!" NEQ "#" (
+        set "!key!=!value!"
+    )
+)
+
+REM Set variables for the script
+set DB_HOST=%DB_HOST%
+set DB_PORT=%DB_PORT%
+set DB_NAME=%DB_DATABASE%
+set DB_USER=%DB_USERNAME%
+set DB_PASSWORD=%DB_PASSWORD%
 
 echo 📋 Database Configuration:
 echo    Host: %DB_HOST%

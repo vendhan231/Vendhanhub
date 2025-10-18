@@ -44,7 +44,7 @@ const mockInternalMessages: InternalMessage[] = [];
 // All localStorage-based data persistence has been removed from this file.
 // =====================================================================================
 
-// const API_BASE_URL = '/api/v1'; // Example base URL for your backend
+const API_BASE_URL = 'http://localhost:3001'; // Backend API URL
 
 // --- User Management Interfaces (kept for consistency with AuthContext) ---
 export interface ParsedLoginCredentials {
@@ -63,7 +63,28 @@ export interface ParsedRegisterData {
 }
 
 // --- Helper to get the auth token ---
-// const getAuthToken = (): string | null => localStorage.getItem('authToken');
+const getAuthToken = (): string | null => localStorage.getItem('authToken');
+
+// --- Helper to make authenticated requests ---
+const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}): Promise<any> => {
+  const token = getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...options.headers,
+  };
+
+  const response = await fetch(`${API_BASE_URL}${url}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json();
+};
 
 // --- Helper to convert StoredUser to User ---
 const stripPassword = (storedUser: StoredUser): User => {
@@ -73,17 +94,37 @@ const stripPassword = (storedUser: StoredUser): User => {
 
 // --- User API Functions ---
 export const apiLogin = async (credentials: ParsedLoginCredentials): Promise<{ user: User, token: string }> => {
-  console.warn("apiLogin: Called with mock data store.");
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(credentials),
+    });
 
-  const foundUser = mockUserDatabase.find(
-    u => u.username === credentials.username && u.password_hash === credentials.password
-  );
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Login failed');
+    }
 
-  if (foundUser) {
-    return Promise.resolve({ user: stripPassword(foundUser), token: `fake-token-for-${foundUser.id}` });
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Login API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn("apiLogin: Backend not available, falling back to mock data store.");
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+
+    const foundUser = mockUserDatabase.find(
+      u => u.username === credentials.username && u.password_hash === credentials.password
+    );
+
+    if (foundUser) {
+      return Promise.resolve({ user: stripPassword(foundUser), token: `fake-token-for-${foundUser.id}` });
+    }
+    return Promise.reject(new Error('Invalid username or password. Please try again.'));
   }
-  return Promise.reject(new Error('Invalid username or password. Please try again.'));
 };
 
 export const apiRegister = async (userData: ParsedRegisterData): Promise<User> => {
@@ -265,7 +306,7 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
     activeUsers: users.length, 
     presentToday: attendance.filter(a => a.clockInTime && !a.clockOutTime).length, 
     absentToday: users.filter(u => u.role === UserRole.EMPLOYEE).length - attendance.filter(a => a.clockInTime && !a.clockOutTime).length,  
-    ongoingProjects: projects.slice(0, 3).map(p => ({id: p.id, name: p.name}))
+    projects: projects
   });
 };
 
@@ -273,12 +314,14 @@ export const fetchEmployeeDashboardData = async (userId: string): Promise<Employ
   console.warn(`fetchEmployeeDashboardData (${userId}): Called with mock data store.`);
   await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
   const user = await apiFetchUserById(userId); // Uses the dynamic list
+  const projects = await apiFetchProjects();
   return Promise.resolve({ 
     personalInfo: {
         phone: user?.phone || 'N/A',
         department: user?.department || 'N/A',
         joinDate: user?.joinDate ? formatDate(user.joinDate) : 'N/A',
     }, 
+    projects,
     quickActions: ['Submit Work Report', 'Apply for Leave'] 
   });
 };

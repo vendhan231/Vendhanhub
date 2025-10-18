@@ -22,7 +22,7 @@ export const createReport = async (req: Request, res: Response) => {
       message: 'Report submitted successfully',
       report: result.report,
       billing: result.billing,
-      billingAmount: result.billing.billingAmount,
+      billingAmount: result.billing.calculatedAmount,
     });
   } catch (error: any) {
     if (error instanceof ZodError) {

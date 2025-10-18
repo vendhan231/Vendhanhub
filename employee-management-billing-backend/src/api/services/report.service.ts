@@ -60,8 +60,8 @@ export const createReport = async (data: ReportData) => {
   });
   if (!project) throw new Error('Project not found');
 
-  const fieldConfig = JSON.parse(project.fieldConfig);
-  const billingConfig = JSON.parse(project.billingConfig);
+  const fieldConfig = JSON.parse(project.fieldConfig || '{}');
+  const billingConfig = JSON.parse(project.billingConfig || '{}');
 
   // Validate report-level fields
   for (const field of fieldConfig.report_level) {
@@ -129,14 +129,15 @@ export const createReport = async (data: ReportData) => {
   // Create billing record
   const billing = await prisma.billingRecord.create({
     data: {
-      reportId: report.id,
       userId,
       projectId,
       projectName: project.name, // project is guaranteed to exist from earlier check
-      totalItems,
-      totalCount,
-      rate: billingConfig.rateValue,
-      billingAmount,
+      clientName: project.name, // Using project name as client name for now
+      hoursBilled: totalItems,
+      rateApplied: rate,
+      calculatedAmount: billingAmount,
+      date: new Date(),
+      isCountBased: false,
     },
   });
 
@@ -173,7 +174,6 @@ export const getReports = async (userId?: string, projectId?: string) => {
       user: true,
       project: true,
       items: true,
-      billing: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -192,7 +192,6 @@ export const getReportById = async (id: string) => {
       user: true,
       project: true,
       items: true,
-      billing: true,
     },
   });
 

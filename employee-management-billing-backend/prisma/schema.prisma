@@ -3,212 +3,211 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-
 // MODELS
 model User {
-  id                      String    @id @default(uuid())
-  username                String    @unique
-  email                   String    @unique
-  passwordHash            String
-  role                    String    @default("EMPLOYEE")
-  firstName               String
-  lastName                String
-  profilePictureUrl       String?
-  phone                   String?
-  department              String?
-  joinDate                DateTime?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-
-  dailyWorkReports        DailyWorkReport[]
-  leaveRequests           LeaveRequest[]
-  attendanceRecords       AttendanceRecord[]
-  reports                 Report[]
-  billingRecords          BillingRecord[]
-  sentMessages            InternalMessage[] @relation("Sender")
-  objectIDIndices         ObjectIDIndex[]
-  billingRecordDetails    BillingRecordDetail[]
-}
-
-model Project {
-  id                      String    @id @default(uuid())
-  name                    String    @unique
-  billingType             String
-  ratePerHour             Decimal?
-  countMetricLabel        String?
-  countDivisor            Int?      @default(1)
-  countMultiplier         Decimal?
-  fieldConfig             String?   // JSON string for field configuration
-  billingConfig           String?   // JSON string for billing configuration
-  is_active               Boolean?  @default(true)
-  description             String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
-
-  projectLogItems         ProjectLogItem[]
-  reports                 Report[]
-  billingRecords          BillingRecord[]
-  objectIDIndices         ObjectIDIndex[]
-  billingRecordDetails    BillingRecordDetail[]
-}
-
-model DailyWorkReport {
   id                String    @id @default(uuid())
-  userId            String
-  date          DateTime
-  submittedAt       DateTime
+  username          String    @unique
+  email             String    @unique
+  passwordHash      String
+  role              String    @default("EMPLOYEE")
+  firstName         String
+  lastName          String
+  profilePictureUrl String?
+  phone             String?
+  department        String?
+  joinDate          DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  projectLogItems   ProjectLogItem[]
+  dailyWorkReports     DailyWorkReport[]
+  leaveRequests        LeaveRequest[]
+  attendanceRecords    AttendanceRecord[]
+  reports              Report[]
+  billingRecords       BillingRecord[]
+  sentMessages         InternalMessage[]     @relation("Sender")
+  objectIDIndices      ObjectIDIndex[]
+  billingRecordDetails BillingRecordDetail[]
+}
+
+model Project {
+  id               String   @id @default(uuid())
+  name             String   @unique
+  billingType      String
+  ratePerHour      Decimal?
+  countMetricLabel String?
+  countDivisor     Int?     @default(1)
+  countMultiplier  Decimal?
+  fieldConfig      String? // JSON string for field configuration
+  billingConfig    String? // JSON string for billing configuration
+  is_active        Boolean? @default(true)
+  description      String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  projectLogItems      ProjectLogItem[]
+  reports              Report[]
+  billingRecords       BillingRecord[]
+  objectIDIndices      ObjectIDIndex[]
+  billingRecordDetails BillingRecordDetail[]
+}
+
+model DailyWorkReport {
+  id          String   @id @default(uuid())
+  userId      String
+  date        DateTime
+  submittedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projectLogItems ProjectLogItem[]
 
   @@unique([userId, date])
 }
 
 model ProjectLogItem {
-  id                  String    @id @default(uuid())
-  dailyWorkReportId   String
-  projectId           String
-  projectName         String
-  hoursWorked         Decimal
-  description         String
-  achievedCount       Int?
+  id                String  @id @default(uuid())
+  dailyWorkReportId String
+  projectId         String
+  projectName       String
+  hoursWorked       Decimal
+  description       String
+  achievedCount     Int?
 
-  dailyWorkReport     DailyWorkReport @relation(fields: [dailyWorkReportId], references: [id], onDelete: Cascade)
-  project             Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  dailyWorkReport DailyWorkReport @relation(fields: [dailyWorkReportId], references: [id], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
 }
 
 model LeaveRequest {
-  id                  String        @id @default(uuid())
-  userId              String
-  userFirstName       String
-  userLastName        String
-  leaveType           String
-  startDate           DateTime
-  endDate             DateTime
-  reason              String
-  status              String        @default("PENDING")
-  requestedAt         DateTime
-  adminNotes          String?
-  resolvedAt          DateTime?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  id            String    @id @default(uuid())
+  userId        String
+  userFirstName String
+  userLastName  String
+  leaveType     String
+  startDate     DateTime
+  endDate       DateTime
+  reason        String
+  status        String    @default("PENDING")
+  requestedAt   DateTime
+  adminNotes    String?
+  resolvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
-  user                User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AttendanceRecord {
-  id            String    @id @default(uuid())
-  userId        String
-  date              DateTime
-  clockInTime   DateTime
-  clockOutTime  DateTime?
-  totalHours    Decimal?
-  notes         String?
-  
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id           String    @id @default(uuid())
+  userId       String
+  date         DateTime
+  clockInTime  DateTime
+  clockOutTime DateTime?
+  totalHours   Decimal?
+  notes        String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId, date])
 }
 
 model Report {
-  id                       String        @id @default(uuid())
-  projectId                String
-  userId                   String
-  reportData               String        // JSON string for report-level fields
-  createdAt                DateTime      @default(now())
-  updatedAt                DateTime      @updatedAt
+  id         String   @id @default(uuid())
+  projectId  String
+  userId     String
+  reportData String // JSON string for report-level fields
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  user                     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project                  Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  items                    ReportItem[]
-  objectIDIndices          ObjectIDIndex[]
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  items           ReportItem[]
+  objectIDIndices ObjectIDIndex[]
 }
 
 model ReportItem {
-  id                       String        @id @default(uuid())
-  reportId                 String
-  itemData                 String        // JSON string for item-level fields
+  id       String @id @default(uuid())
+  reportId String
+  itemData String // JSON string for item-level fields
 
-  report                   Report        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
 }
 
 model BillingRecord {
-   id                       String        @id @default(uuid())
-   userId                   String
-   projectId                String
-   projectName              String?
-   clientName               String
-   hoursBilled              Decimal?
-   rateApplied              Decimal?
-   calculatedAmount         Decimal
-   date                     DateTime
-   status                   String        @default("PENDING")
-   notes                    String?
-   isCountBased             Boolean
-   achievedCountTotal       Int?
-   countMetricLabelUsed     String?
-   formulaUsed              String?
-   billingPeriodStartDate   DateTime?
-   billingPeriodEndDate     DateTime?
-   createdAt                DateTime      @default(now())
-   updatedAt                DateTime      @updatedAt
+  id                     String    @id @default(uuid())
+  userId                 String
+  projectId              String
+  projectName            String?
+  clientName             String
+  hoursBilled            Decimal?
+  rateApplied            Decimal?
+  calculatedAmount       Decimal
+  date                   DateTime
+  status                 String    @default("PENDING")
+  notes                  String?
+  isCountBased           Boolean
+  achievedCountTotal     Int?
+  countMetricLabelUsed   String?
+  formulaUsed            String?
+  billingPeriodStartDate DateTime?
+  billingPeriodEndDate   DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
-   details                  String?
+  details String?
 
-   user                     User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-   project                  Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
-   billingRecordDetails     BillingRecordDetail[]
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project              Project               @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  billingRecordDetails BillingRecordDetail[]
 }
 
 model ObjectIDIndex {
-  id                       String        @id @default(uuid())
-  objectId                 String
-  reportId                 String
-  projectId                String
-  userId                   String
-  createdAt                DateTime      @default(now())
+  id        String   @id @default(uuid())
+  objectId  String
+  reportId  String
+  projectId String
+  userId    String
+  createdAt DateTime @default(now())
 
-  report                   Report        @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user                     User          @relation(fields: [userId], references: [id], onDelete: Restrict)
-  project                  Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  report  Report  @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
 
   @@unique([objectId, projectId])
 }
 
 model BillingRecordDetail {
-  id                           String    @id @default(uuid())
-  billingRecordId              String
-  userId                       String
-  projectId                    String
-  projectName                  String
-  totalAchievedCount           Int
-  metricLabel                  String
-  formulaApplied               String
-  calculatedAmountForProject   Decimal
-  
-  billingRecord   BillingRecord   @relation(fields: [billingRecordId], references: [id], onDelete: Cascade)
-  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
-  project         Project         @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  id                         String  @id @default(uuid())
+  billingRecordId            String
+  userId                     String
+  projectId                  String
+  projectName                String
+  totalAchievedCount         Int
+  metricLabel                String
+  formulaApplied             String
+  calculatedAmountForProject Decimal
+
+  billingRecord BillingRecord @relation(fields: [billingRecordId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project       Project       @relation(fields: [projectId], references: [id], onDelete: Restrict)
 }
 
 model InternalMessage {
-  id                          String    @id @default(uuid())
-  senderId                    String?
-  senderName                  String
-  senderProfilePictureUrl     String?
-  recipientId                 String
-  content                     String
-  timestamp                   DateTime
-  isRead                      Boolean   @default(false)
-  relatedEntityId             String?
-  relatedEntityType           String?
-  createdAt                   DateTime  @default(now())
+  id                      String   @id @default(uuid())
+  senderId                String?
+  senderName              String
+  senderProfilePictureUrl String?
+  recipientId             String
+  content                 String
+  timestamp               DateTime
+  isRead                  Boolean  @default(false)
+  relatedEntityId         String?
+  relatedEntityType       String?
+  createdAt               DateTime @default(now())
 
-  sender                      User?     @relation("Sender", fields: [senderId], references: [id], onDelete: SetNull)
+  sender User? @relation("Sender", fields: [senderId], references: [id], onDelete: SetNull)
 }

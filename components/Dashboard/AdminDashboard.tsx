@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { fetchAdminDashboardData } from '../../services/api';
 import { AdminDashboardData } from '../../types';
 import { THEME, POSITIVE_MESSAGES } from '../../constants';
-import { useAuth } from '../../hooks/useAuth'; 
+import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../context/SocketContext';
 import { UsersIcon, UserGroupIcon, BriefcaseIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 
 
@@ -21,11 +22,26 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
 
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth(); 
+  const { user } = useAuth();
+  const { socket } = useSocket();
   const [data, setData] = useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [positiveMessage, setPositiveMessage] = useState<string>('');
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('dashboard-update', (update: AdminDashboardData) => {
+        setData(update);
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('dashboard-update');
+      }
+    };
+  }, [socket]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -104,10 +120,10 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       <div className={`mt-8 p-6 bg-white rounded-xl shadow-lg`}>
-        <h3 className={`text-xl font-semibold text-${THEME.accentText} mb-4`}>Ongoing Projects</h3>
-        {data.ongoingProjects && data.ongoingProjects.length > 0 ? (
+        <h3 className={`text-xl font-semibold text-${THEME.accentText} mb-4`}>Projects</h3>
+        {data.projects && data.projects.length > 0 ? (
             <ul className={`text-sm text-gray-700 space-y-2`}>
-                {data.ongoingProjects.map(project => (
+                {data.projects.map(project => (
                     <li key={project.id} className={`p-2 bg-gray-50 rounded-md flex items-center`}>
                         <BriefcaseIcon className={`h-4 w-4 mr-2 text-${THEME.secondary}`} />
                         {project.name}
@@ -115,7 +131,7 @@ const AdminDashboard: React.FC = () => {
                 ))}
             </ul>
         ) : (
-            <p className={`text-sm text-gray-500`}>No ongoing projects listed currently.</p>
+            <p className={`text-sm text-gray-500`}>No projects listed currently.</p>
         )}
       </div>
 

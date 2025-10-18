@@ -139,11 +139,19 @@ const UserManagement = () => {
     if (!confirm("Are you sure you want to delete this user?")) return;
 
     try {
-        // Delete user logic would go here (remove userId if not used)
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (!res.ok) {
+        throw new Error("Failed to delete user");
+      }
       toast.success("User deleted successfully");
-          await loadUsers(); // This line uses userId, ensure it's used correctly
+      await loadUsers(); // Reload users after deletion
     } catch (error: any) {
-      toast.error("Failed to delete user");
+      toast.error(error.message || "Failed to delete user");
       console.error(error);
     }
   };

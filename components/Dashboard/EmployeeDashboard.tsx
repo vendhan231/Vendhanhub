@@ -3,8 +3,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { fetchEmployeeDashboardData, apiClockIn, apiClockOut, apiGetUserTodayAttendanceStatus, apiFetchAllAttendanceRecords } from '../../services/api';
 import { EmployeeDashboardData, UserAttendanceStatus } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../context/SocketContext';
 import { THEME, POSITIVE_MESSAGES } from '../../constants';
-import { PhoneIcon, BuildingOfficeIcon, CalendarDaysIcon, CogIcon, PlayCircleIcon, StopCircleIcon } from '@heroicons/react/24/outline';
+import { PhoneIcon, BuildingOfficeIcon, CalendarDaysIcon, CogIcon, PlayCircleIcon, StopCircleIcon, BriefcaseIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
 import { getCurrentDateTime, formatTime, calculateDuration } from '../../utils/dateUtils';
 
@@ -30,6 +31,7 @@ const InfoCard: React.FC<InfoCardProps> = ({ label, value, icon }) => (
 
 const EmployeeDashboard: React.FC = () => {
   const { user } = useAuth();
+  const { socket } = useSocket();
   const [data, setData] = useState<EmployeeDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +50,20 @@ const EmployeeDashboard: React.FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('dashboard-update', (update: EmployeeDashboardData) => {
+        setData(update);
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('dashboard-update');
+      }
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (attendanceStatus?.isClockedIn && attendanceStatus.lastClockInTime) {
@@ -243,6 +259,15 @@ const EmployeeDashboard: React.FC = () => {
                 View/Edit Profile
             </button>
         </Link>
+      </div>
+
+      <div className={`p-6 bg-white rounded-xl shadow-lg`}>
+        <h3 className={`text-xl font-semibold text-${THEME.accentText} mb-4`}>Your Projects</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.projects?.map(project => (
+            <InfoCard key={project.id} label={project.name} value={project.billingType} icon={<BriefcaseIcon className="h-5 w-5"/>} />
+          ))}
+        </div>
       </div>
 
     </div>
