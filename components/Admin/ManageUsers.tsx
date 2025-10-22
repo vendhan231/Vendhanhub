@@ -1,30 +1,23 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { apiFetchAllUsers } from "../../services/api";
+import { User, UserRole } from "../../types";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Users, UserPlus, Pencil, Trash2, Search } from "lucide-react";
+import { Loader2, Users, UserPlus, Pencil, Trash2, Search, Eye } from "lucide-react";
 
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: 'ADMIN' | 'EMPLOYEE';
-  department?: string;
-  joinDate?: string;
-  createdAt: string;
-}
 
 const UserManagement = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-    const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState({
     username: "",
@@ -38,33 +31,8 @@ const UserManagement = () => {
 
   const loadUsers = async () => {
     try {
-      // For now, we'll use mock data since we don't have API endpoints yet
-      // In a real implementation, this would call an API
-      const mockUsers: User[] = [
-        {
-          id: '1',
-          username: 'renuga',
-          email: 'renuga@company.com',
-          firstName: 'Renuga',
-          lastName: 'Admin',
-          role: 'ADMIN',
-          department: 'Administration',
-          joinDate: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          username: 'angeeswari',
-          email: 'angeeswari@company.com',
-          firstName: 'Angeeswari',
-          lastName: '',
-          role: 'EMPLOYEE',
-          department: 'Operations',
-          joinDate: new Date().toISOString(),
-          createdAt: new Date().toISOString(),
-        },
-      ];
-      setUsers(mockUsers);
+      const fetchedUsers = await apiFetchAllUsers();
+      setUsers(fetchedUsers);
     } catch (error: any) {
       toast.error("Failed to load users");
       console.error(error);
@@ -128,7 +96,7 @@ const UserManagement = () => {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role,
+      role: user.role === UserRole.ADMIN ? 'ADMIN' as const : 'EMPLOYEE' as const,
       department: user.department || "",
       password: "", // Don't populate password for editing
     });
@@ -327,6 +295,14 @@ const UserManagement = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => navigate(`/app/admin/users/${user.id}`)}
+                          title="View user details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleEdit(user)}
                         >
                           <Pencil className="w-4 h-4" />
@@ -346,7 +322,7 @@ const UserManagement = () => {
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground font-medium">Role:</span>
                       <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold shadow-soft ${
-                        user.role === 'ADMIN'
+                        user.role === UserRole.ADMIN
                           ? "bg-secondary/20 text-secondary-foreground border border-secondary/30"
                           : "bg-accent/20 text-accent-foreground border border-accent/30"
                       }`}>

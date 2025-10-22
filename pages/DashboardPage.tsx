@@ -3,7 +3,8 @@ import { useAuth } from '../hooks/useAuth';
 import MainLayout from '../components/Layout/MainLayout';
 import AdminDashboard from '../components/Dashboard/AdminDashboard';
 import EmployeeDashboard from '../components/Dashboard/EmployeeDashboard';
-import ManageEmployees from '../components/Admin/ManageEmployees';
+import ManageUsers from '../components/Admin/ManageUsers';
+import UserDetailView from '../components/Admin/UserDetailView';
 import ManageProjects from '../components/Admin/ManageProjects';
 import ManageBilling from '../components/Admin/ManageBilling';
 import BillingForm from '../components/Admin/BillingForm';
@@ -12,6 +13,7 @@ import ManageLeaveRequests from '../components/Admin/ManageLeaveRequests';
 import AdminSendNotification from '../components/Admin/AdminSendNotification'; 
 import ViewAttendanceReports from '../components/Admin/ViewAttendanceReports'; 
 import ViewWorkReports from '../components/Admin/ViewWorkReports'; 
+import ObjectIdRegistry from '../components/Admin/ObjectIdRegistry';
 import Register from '../components/Register'; // Import Register component
 
 
@@ -50,7 +52,7 @@ const DashboardPage: React.FC = () => {
     );
   }
   
-  // location.pathname will be like "/app/admin/employees". We need to match based on the part after "/app"
+  // location.pathname will be like "/app/admin/users". We need to match based on the part after "/app"
   const baseAppPath = '/app';
   const relativePath = location.pathname.startsWith(baseAppPath) 
     ? location.pathname.substring(baseAppPath.length) 
@@ -70,8 +72,13 @@ const DashboardPage: React.FC = () => {
 
 
   if(user.role === UserRole.ADMIN) {
-    if (path === '/admin/employees') {
-      return <MainLayout><ManageEmployees /></MainLayout>;
+    if (path === '/admin/users') {
+      return <MainLayout><ManageUsers /></MainLayout>;
+    }
+    // Match /admin/users/:userId for user detail view
+    const userDetailMatch = path.match(/^\/admin\/users\/([^/]+)$/);
+    if (userDetailMatch) {
+      return <MainLayout><UserDetailView /></MainLayout>;
     }
     if (path === '/admin/register') { // New route for admin to register users
       return <MainLayout><Register /></MainLayout>;
@@ -105,6 +112,9 @@ const DashboardPage: React.FC = () => {
     }
     if (path === ('/admin/work-reports')) {
       return <MainLayout><ViewWorkReports /></MainLayout>;
+    }
+    if (path === ('/admin/object-registry')) {
+      return <MainLayout><ObjectIdRegistry /></MainLayout>;
     }
   } else if (user.role === UserRole.EMPLOYEE) {
      if (path === ('/employee/profile')) {

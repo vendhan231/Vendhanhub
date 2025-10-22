@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { apiSubmitDailyWorkReport } from "@/services/api";
+import { apiSubmitDailyWorkReport, apiFetchProjects } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import PasteDataModal from "./PasteDataModal";
 import {
   FileText,
   Calculator,
@@ -17,19 +18,20 @@ import {
   Loader2,
   Upload,
   Trash2,
-  Eye
+  Eye,
+  Clipboard
 } from "lucide-react";
 
 interface Project {
   id: string;
   name: string;
-  billingType: 'hourly' | 'count_based';
+  billingType?: 'hourly' | 'count_based';
   ratePerHour?: number;
   countMetricLabel?: string;
   countDivisor?: number;
   countMultiplier?: number;
-  item_fields: ProjectField[];
-  billing_formula: string;
+  item_fields?: ProjectField[];
+  billing_formula?: string;
 }
 
 interface ProjectField {
@@ -89,50 +91,39 @@ const SubmitWorkReportForm = () => {
     action?: 'delete' | 'keep';
   }>({ show: false, duplicates: [] });
 
+  // Paste functionality
+  const [pasteModalOpen, setPasteModalOpen] = useState(false);
+
   // Load projects
   useEffect(() => {
     loadProjects();
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        switch (event.key) {
+          case 'V':
+            if (event.shiftKey) {
+              event.preventDefault();
+              setPasteModalOpen(true);
+            }
+            break;
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const loadProjects = async () => {
     try {
-  // setLoading(true); (removed)
-      // Mock data for now - replace with API call
-      const mockProjects: Project[] = [
-        {
-          id: "1",
-          name: "Content Writing Project",
-          billingType: "count_based",
-          countMetricLabel: "WordCount",
-          countDivisor: 1000,
-          countMultiplier: 4.85,
-          item_fields: [
-            { id: "1", label: "Object_ID", type: "text", required: true },
-            { id: "2", label: "CharacterCount", type: "number", required: true },
-            { id: "3", label: "Description", type: "textarea", required: false },
-          ],
-          billing_formula: "CharacterCount/1000*4.85",
-        },
-        {
-          id: "2",
-          name: "Data Entry Project",
-          billingType: "count_based",
-          countMetricLabel: "RecordCount",
-          countDivisor: 1,
-          countMultiplier: 1.25,
-          item_fields: [
-            { id: "1", label: "Object_ID", type: "text", required: true },
-            { id: "2", label: "RecordCount", type: "number", required: true },
-            { id: "3", label: "Notes", type: "textarea", required: false },
-          ],
-          billing_formula: "RecordCount*1.25",
-        },
-      ];
-      setProjects(mockProjects);
+      const fetchedProjects = await apiFetchProjects();
+      setProjects(fetchedProjects);
     } catch (error) {
       toast.error("Failed to load projects");
-    } finally {
-      // setLoading(false); (removed)
     }
   };
 
@@ -157,7 +148,7 @@ const SubmitWorkReportForm = () => {
     }));
   };
 
-  const handleObjectChange = (id: string, field: 'objectId' | 'customFields', value: any, customFieldLabel?: string) => {
+  const handleObjectChange = async (id: string, field: 'objectId' | 'customFields', value: any, customFieldLabel?: string) => {
     setFormData(prev => ({
       ...prev,
       objects: prev.objects.map(obj => {
@@ -178,6 +169,22 @@ const SubmitWorkReportForm = () => {
         return obj;
       })
     }));
+
+    // Real-time duplicate detection
+    if (field === 'objectId' && value.trim()) {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/object-ids/check/${encodeURIComponent(value)}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Show duplicate warning if found
+          if (data.exists) {
+            toast.warning(`Object ID "${value}" already exists in ${data.duplicateCount} other reports`);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking Object ID:', error);
+      }
+    }
   };
 
   // Handle project selection
@@ -264,20 +271,30 @@ const SubmitWorkReportForm = () => {
 
   // Calculate billing
   const calculateBilling = () => {
-    if (!selectedProject) return;
+    if (!selectedProject || !selectedProject.billing_formula || !selectedProject.item_fields) return;
 
     try {
       let totalBilling = 0;
       formData.objects.forEach(object => {
-        let formula = selectedProject.billing_formula;
-        
-        selectedProject.item_fields.forEach(field => {
+        let formula = selectedProject.billing_formula!;
+
+        selectedProject.item_fields!.forEach(field => {
           if (field.type === 'number') {
             const value = object.customFields[field.label] || 0;
-            formula = formula.replace(new RegExp(field.label, 'g'), value.toString());
+            formula = formula!.replace(new RegExp(field.label, 'g'), value.toString());
+          } else if (field.type === 'date') {
+            // For date fields, you might want to calculate days, age, etc.
+            // For now, we'll skip them in calculations unless specifically needed
+            const dateValue = object.customFields[field.label];
+            if (dateValue) {
+              // Example: convert to days since epoch or extract day/month
+              // This is just a placeholder - actual implementation depends on requirements
+              formula = formula!.replace(new RegExp(field.label, 'g'), '0');
+            }
           }
+          // Text and textarea fields are not used in numerical calculations
         });
-        
+
         const result = new Function('return ' + formula)();
         totalBilling += Number(result) || 0;
       });
@@ -288,6 +305,22 @@ const SubmitWorkReportForm = () => {
       toast.error("Invalid formula or missing values in one of the objects");
       setCalculationResult(0);
     }
+  };
+
+  // Handle paste insert
+  const handlePasteInsert = (objects: any[]) => {
+    setFormData(prev => ({
+      ...prev,
+      objects: [
+        ...prev.objects,
+        ...objects.map(obj => ({
+          id: `item-${Date.now()}-${Math.random()}`,
+          objectId: obj.objectId,
+          customFields: obj.customFields
+        }))
+      ]
+    }));
+    calculateBilling(); // Trigger billing calculation
   };
 
   // Submit work report
@@ -452,8 +485,7 @@ const SubmitWorkReportForm = () => {
                     </div>
 
                     {/* Dynamic Project Fields */}
-                    {selectedProject.item_fields
-                      .filter(field => field.label !== 'Object_ID')
+                    {selectedProject.item_fields?.filter(field => field.label !== 'Object_ID')
                       .map(field => (
                         <div key={field.id} className="space-y-2">
                           <Label htmlFor={`${field.label}-${object.id}`}>
@@ -480,6 +512,17 @@ const SubmitWorkReportForm = () => {
                               required={field.required}
                             />
                           )}
+                          {field.type === 'date' && (
+                            <Input
+                              id={`${field.label}-${object.id}`}
+                              type="date"
+                              value={object.customFields[field.label] || ''}
+                              onChange={(e) => handleObjectChange(object.id, 'customFields', e.target.value, field.label)}
+                              placeholder={`Enter ${field.label.toLowerCase()}`}
+                              className="h-12"
+                              required={field.required}
+                            />
+                          )}
                           {field.type === 'textarea' && (
                             <Textarea
                               id={`${field.label}-${object.id}`}
@@ -495,9 +538,20 @@ const SubmitWorkReportForm = () => {
                   </div>
                 ))}
 
-                <Button type="button" variant="outline" onClick={addObject}>
-                  Add Another Object
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" onClick={addObject}>
+                    Add Another Object
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setPasteModalOpen(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Clipboard className="w-4 h-4" />
+                    Paste Data (Ctrl+Shift+V)
+                  </Button>
+                </div>
 
                 {/* Billing Calculator */}
                 <div className="pt-4 border-t border-primary/20">
@@ -706,6 +760,17 @@ const SubmitWorkReportForm = () => {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Paste Data Modal */}
+      {selectedProject && (
+        <PasteDataModal
+          open={pasteModalOpen}
+          onOpenChange={setPasteModalOpen}
+          projectFields={selectedProject.item_fields || []}
+          onInsert={handlePasteInsert}
+          projectId={selectedProject.id}
+        />
       )}
     </div>
   );

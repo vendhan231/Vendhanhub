@@ -66,6 +66,13 @@ export interface BillingConfig {
   formula?: string;
 }
 
+export interface ProjectField {
+  id: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'textarea';
+  required: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -79,6 +86,15 @@ export interface Project {
   countMetricLabel?: string;
   countDivisor?: number;
   countMultiplier?: number;
+  // New fields for dynamic project structure
+  item_fields?: ProjectField[];
+  billing_formula?: string;
+  edit_window_hours?: number;
+  is_active?: boolean;
+  is_template?: boolean;
+  template_category?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // --- Detailed Billing Calculation Types ---

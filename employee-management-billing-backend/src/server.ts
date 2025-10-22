@@ -19,6 +19,8 @@ import reportRoutes from './api/routes/report.routes';
 import uploadRoutes from './api/routes/upload.routes';
 import billingRoutes from './api/routes/billing.routes';
 import healthRoutes from './api/routes/health.routes';
+import userDetailRoutes from './api/routes/user-detail.routes';
+import objectIdRoutes from './api/routes/object-id.routes';
 import errorMiddleware from './api/middleware/error.middleware';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -34,8 +36,19 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: true,
-    credentials: true
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.warn(`Socket.IO CORS blocked request from origin: ${origin}`);
+        return callback(new Error('Not allowed by CORS'), false);
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST']
   }
 });
 
@@ -86,6 +99,8 @@ app.use('/ai', aiRoutes);
 app.use('/reports', reportRoutes);
 app.use('/upload', uploadRoutes);
 app.use('/billing', billingRoutes);
+app.use('/api/user-details', userDetailRoutes);
+app.use('/api/object-ids', objectIdRoutes);
 
 app.use('/auth/login', authLimiter);
 app.use('/auth/register', authLimiter);
@@ -117,10 +132,33 @@ app.use(errorMiddleware);
 const PORT = Number(process.env.PORT) || 3000;
 const HOST = process.env.HOST || '0.0.0.0'; // Bind to all interfaces (*) for LAN access
 
-// Configure CORS for LAN access
+// Configure CORS for production and LAN access
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  'http://192.168.29.106:3000',
+  'http://192.168.29.106:5173',
+  process.env.NODE_ENV === 'production' ? `http://${process.env.HOST || 'localhost'}:3000` : null,
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: true, // Allow all origins for LAN access
-  credentials: true
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    } else {
+      console.warn(`CORS blocked request from origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'), false);
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 server.listen(PORT, HOST, () => {

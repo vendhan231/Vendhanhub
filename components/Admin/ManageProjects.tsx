@@ -6,8 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import { FolderPlus, Loader2, Trash2, Calculator, Pencil } from "lucide-react";
+import { FolderPlus, Loader2, Trash2, Calculator, Pencil, Copy } from "lucide-react";
 import { ProjectFieldBuilder, type ProjectField } from "./ProjectFieldBuilder";
 
 interface Project {
@@ -18,6 +21,10 @@ interface Project {
   item_fields: ProjectField[];
   is_active: boolean;
   edit_window_hours: number;
+  is_template?: boolean;
+  template_category?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 const ProjectManagement = () => {
@@ -32,8 +39,12 @@ const ProjectManagement = () => {
     editWindowHours: 24,
   });
   const [fields, setFields] = useState<ProjectField[]>([]);
-  const [testValues, setTestValues] = useState<Record<string, number>>({});
+  const [testValues, setTestValues] = useState<Record<string, string | number>>({});
   const [calculatedTest, setCalculatedTest] = useState<number>(0);
+  const [isTemplate, setIsTemplate] = useState(false);
+  const [templateCategory, setTemplateCategory] = useState('');
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateCategories] = useState(['Content Writing', 'Data Entry', 'Quality Assurance', 'Research', 'Other']);
 
   const loadProjects = async () => {
     try {
@@ -59,6 +70,12 @@ const ProjectManagement = () => {
         if (field.type === 'number') {
           const value = testValues[field.label] || 0;
           formula = formula.replace(new RegExp(field.label, 'g'), value.toString());
+        } else if (field.type === 'date') {
+          // For date fields in testing, use a default date or the entered value
+          const dateValue = testValues[field.label] || new Date().toISOString().split('T')[0];
+          // Convert date to a number (e.g., days since epoch) for calculation
+          const daysSinceEpoch = Math.floor(new Date(dateValue as string).getTime() / (1000 * 60 * 60 * 24));
+          formula = formula.replace(new RegExp(field.label, 'g'), daysSinceEpoch.toString());
         }
       });
 
@@ -77,6 +94,8 @@ const ProjectManagement = () => {
     setFields([]);
     setTestValues({});
     setCalculatedTest(0);
+    setIsTemplate(false);
+    setTemplateCategory('');
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -97,6 +116,8 @@ const ProjectManagement = () => {
           billing_formula: formData.billingFormula,
           item_fields: fields as any,
           edit_window_hours: formData.editWindowHours,
+          is_template: isTemplate,
+          template_category: isTemplate ? templateCategory : undefined,
         } as any);
         toast.success("Project updated successfully");
       } else {
@@ -108,6 +129,8 @@ const ProjectManagement = () => {
           edit_window_hours: formData.editWindowHours,
           created_by: null,
           is_active: true,
+          is_template: isTemplate,
+          template_category: isTemplate ? templateCategory : undefined,
         } as any);
         toast.success("Project created successfully");
       }
@@ -132,6 +155,8 @@ const ProjectManagement = () => {
       editWindowHours: project.edit_window_hours || 24,
     });
     setFields(project.item_fields || []);
+    setIsTemplate(project.is_template || false);
+    setTemplateCategory(project.template_category || '');
     setDialogOpen(true);
   };
 
@@ -146,6 +171,21 @@ const ProjectManagement = () => {
       toast.error("Failed to delete project");
       console.error(error);
     }
+  };
+
+  const handleCloneProject = (project: Project) => {
+    setEditingProject(null);
+    setFormData({
+      name: `${project.name} (Copy)`,
+      description: project.description,
+      billingFormula: project.billing_formula,
+      editWindowHours: project.edit_window_hours || 24,
+    });
+    setFields(project.item_fields || []);
+    setIsTemplate(project.is_template || false);
+    setTemplateCategory(project.template_category || '');
+    setDialogOpen(true);
+    toast.success(`Cloned project: ${project.name}`);
   };
 
   return (
@@ -163,6 +203,40 @@ const ProjectManagement = () => {
               <CardDescription className="text-base mt-2">
                 Create and manage projects with dynamic fields and intelligent billing formulas
               </CardDescription>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button
+                variant={showTemplates ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowTemplates(!showTemplates)}
+              >
+                {showTemplates ? "Show All" : "Show Templates Only"}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Copy className="w-4 h-4 mr-2" />
+                    Clone Template
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {projects
+                    .filter(p => p.is_template)
+                    .map(template => (
+                      <DropdownMenuItem
+                        key={template.id}
+                        onClick={() => handleCloneProject(template)}
+                      >
+                        {template.name} ({template.template_category})
+                      </DropdownMenuItem>
+                    ))}
+                  {projects.filter(p => p.is_template).length === 0 && (
+                    <DropdownMenuItem disabled>
+                      No templates available
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
@@ -221,6 +295,41 @@ const ProjectManagement = () => {
                     </p>
                   </div>
 
+                  {/* Template Configuration */}
+                  <div className="space-y-4 border-t pt-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="isTemplate"
+                        checked={isTemplate}
+                        onCheckedChange={(checked) => setIsTemplate(checked as boolean)}
+                      />
+                      <Label htmlFor="isTemplate" className="text-base font-semibold">
+                        Save as Template
+                      </Label>
+                    </div>
+
+                    {isTemplate && (
+                      <div className="space-y-2">
+                        <Label htmlFor="templateCategory">Template Category</Label>
+                        <Select value={templateCategory} onValueChange={setTemplateCategory}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {templateCategories.map(category => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          Templates help users quickly start new projects with pre-configured fields
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <ProjectFieldBuilder fields={fields} onChange={setFields} />
 
                   <div className="space-y-4 border-t pt-4">
@@ -250,19 +359,31 @@ const ProjectManagement = () => {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         <div className="grid gap-3 md:grid-cols-3">
-                          {fields.filter(f => f.type === 'number').map((field) => (
+                          {fields.filter(f => f.type === 'number' || f.type === 'date').map((field) => (
                             <div key={field.id} className="space-y-1">
                               <Label className="text-xs">{field.label}</Label>
-                              <Input
-                                type="number"
-                                value={testValues[field.label] || ""}
-                                onChange={(e) => setTestValues({
-                                  ...testValues,
-                                  [field.label]: Number(e.target.value),
-                                })}
-                                placeholder="0"
-                                className="h-8"
-                              />
+                              {field.type === 'number' ? (
+                                <Input
+                                  type="number"
+                                  value={testValues[field.label] || ""}
+                                  onChange={(e) => setTestValues({
+                                    ...testValues,
+                                    [field.label]: Number(e.target.value),
+                                  })}
+                                  placeholder="0"
+                                  className="h-8"
+                                />
+                              ) : (
+                                <Input
+                                  type="date"
+                                  value={testValues[field.label] || ""}
+                                  onChange={(e) => setTestValues({
+                                    ...testValues,
+                                    [field.label]: e.target.value,
+                                  })}
+                                  className="h-8"
+                                />
+                              )}
                             </div>
                           ))}
                         </div>
@@ -309,7 +430,9 @@ const ProjectManagement = () => {
             </div>
           ) : (
             <div className="grid gap-6">
-              {projects.map((project) => (
+              {projects
+                .filter(project => !showTemplates || project.is_template)
+                .map((project) => (
                 <Card key={project.id} className="glass-card border-l-4 border-l-primary shadow-soft hover:shadow-medium transition-all duration-300 animate-slide-up">
                   <CardHeader className="pb-4">
                     <div className="flex items-start justify-between">
@@ -329,6 +452,16 @@ const ProjectManagement = () => {
                         >
                           <Pencil className="w-4 h-4" />
                         </Button>
+                        {project.is_template && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCloneProject(project)}
+                            className="text-primary hover:text-primary"
+                          >
+                            Clone
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
@@ -360,21 +493,35 @@ const ProjectManagement = () => {
 
                     <div className="flex items-center justify-between text-sm pt-2 border-t">
                       <span className="text-muted-foreground font-medium">Status:</span>
-                      <span
-                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold shadow-soft ${
-                          project.is_active
-                            ? "bg-secondary/20 text-secondary-foreground border border-secondary/30"
-                            : "bg-muted/20 text-muted-foreground border border-muted/30"
-                        }`}
-                      >
-                        {project.is_active ? "Active" : "Inactive"}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {project.is_template && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-accent/20 text-accent-foreground border border-accent/30">
+                            Template
+                          </span>
+                        )}
+                        <span
+                          className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold shadow-soft ${
+                            project.is_active
+                              ? "bg-secondary/20 text-secondary-foreground border border-secondary/30"
+                              : "bg-muted/20 text-muted-foreground border border-muted/30"
+                          }`}
+                        >
+                          {project.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Edit Window:</span>
                       <span className="text-sm font-medium">{project.edit_window_hours} hours</span>
                     </div>
+
+                    {project.is_template && project.template_category && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Category:</span>
+                        <span className="text-sm font-medium">{project.template_category}</span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

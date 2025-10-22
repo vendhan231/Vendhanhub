@@ -4,64 +4,109 @@ const prisma = new PrismaClient();
 
 interface ProjectData {
   name: string;
-  billingConfig: any; // JSON-serializable billing config
-  fieldConfig: any; // JSON-serializable field config (report_level, item_level)
+  description?: string;
+  billing_formula: string;
+  item_fields: any[];
+  edit_window_hours?: number;
+  is_template?: boolean;
+  template_category?: string;
   is_active?: boolean;
-  description?: string | null;
 }
 
-const ensureObjectIdInFieldConfig = (fieldConfig: any) => {
-  const fc = fieldConfig || { report_level: [], item_level: [] };
-  fc.item_level = Array.isArray(fc.item_level) ? [...fc.item_level] : [];
-  const hasObjectId = fc.item_level.some((f: any) => (f.label || '').toLowerCase() === 'object id' || (f.label || '').toLowerCase() === 'objectid');
+interface ProjectResponse {
+  id: string;
+  name: string;
+  description?: string;
+  billing_formula: string;
+  item_fields: any[];
+  edit_window_hours?: number;
+  is_template?: boolean;
+  template_category?: string;
+  is_active?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Convert frontend format to backend format
+const convertToBackendFormat = (data: ProjectData) => {
+  const itemFields = ensureObjectIdInFields(data.item_fields);
+
+  return {
+    name: data.name,
+    description: data.description,
+    fieldConfig: JSON.stringify({
+      report_level: [],
+      item_level: itemFields.map(field => ({
+        label: field.label,
+        type: field.type,
+        required: field.required,
+        options: field.options || [],
+        unique: field.unique || false,
+        includeInBilling: field.includeInBilling || false,
+      }))
+    }),
+    billingConfig: JSON.stringify({
+      rateType: 'custom_formula',
+      formula: data.billing_formula,
+      rateValue: 0,
+    }),
+    is_active: data.is_active,
+  };
+};
+
+// Convert backend format to frontend format
+const convertFromBackendFormat = (project: any): ProjectResponse => {
+  const fieldConfig = project.fieldConfig ? JSON.parse(project.fieldConfig) : { report_level: [], item_level: [] };
+  const billingConfig = project.billingConfig ? JSON.parse(project.billingConfig) : {};
+
+  return {
+    id: project.id,
+    name: project.name,
+    description: project.description,
+    billing_formula: billingConfig.formula || '',
+    item_fields: fieldConfig.item_level || [],
+    edit_window_hours: project.edit_window_hours,
+    is_template: project.is_template,
+    template_category: project.template_category,
+    is_active: project.is_active,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  };
+};
+
+const ensureObjectIdInFields = (itemFields: any[]) => {
+  const fields = Array.isArray(itemFields) ? [...itemFields] : [];
+  const hasObjectId = fields.some((f: any) => (f.label || '').toLowerCase() === 'object_id' || (f.label || '').toLowerCase() === 'object id');
   if (!hasObjectId) {
-    fc.item_level.unshift({ label: 'Object ID', type: 'text', required: true });
+    fields.unshift({ id: 'object_id', label: 'Object_ID', type: 'text', required: true, order: 0 });
   } else {
-    fc.item_level.forEach((f: any) => {
-      if ((f.label || '').toLowerCase() === 'object id' || (f.label || '').toLowerCase() === 'objectid') {
+    fields.forEach((f: any) => {
+      if ((f.label || '').toLowerCase() === 'object_id' || (f.label || '').toLowerCase() === 'object id') {
         f.required = true;
       }
     });
   }
-  return fc;
+  return fields;
 };
 
 export const createProject = async (data: ProjectData) => {
-  const fieldConfig = ensureObjectIdInFieldConfig(data.fieldConfig);
-  return await prisma.project.create({
-    // cast data to any because generated Prisma input types in this workspace
-    // don't match perfectly yet — we'll reconcile types across the codebase.
-    data: {
-      name: data.name,
-      fieldConfig: JSON.stringify(fieldConfig),
-      billingConfig: JSON.stringify(data.billingConfig || {}),
-    } as any,
+  const backendData = convertToBackendFormat(data);
+  const project = await prisma.project.create({
+    data: backendData as any,
   });
+  return convertFromBackendFormat(project);
 };
 
 export const getProjectById = async (id: string) => {
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project) return null;
-  return {
-    ...project,
-    fieldConfig: project.fieldConfig ? JSON.parse(project.fieldConfig) : { report_level: [], item_level: [] },
-    billingConfig: project.billingConfig ? JSON.parse(project.billingConfig) : {},
-  };
+  return convertFromBackendFormat(project);
 };
 
 export const updateProject = async (id: string, data: Partial<ProjectData>) => {
-  const updateData: any = {};
-  if (data.name) updateData.name = data.name;
-  if (data.fieldConfig) updateData.fieldConfig = JSON.stringify(ensureObjectIdInFieldConfig(data.fieldConfig));
-  if (data.billingConfig) updateData.billingConfig = JSON.stringify(data.billingConfig);
-  if (data.is_active !== undefined) updateData.is_active = data.is_active;
-  if (data.description !== undefined) updateData.description = data.description;
-  const project = await prisma.project.update({ where: { id }, data: updateData });
-  return {
-    ...project,
-    fieldConfig: project.fieldConfig ? JSON.parse(project.fieldConfig) : { report_level: [], item_level: [] },
-    billingConfig: project.billingConfig ? JSON.parse(project.billingConfig) : {},
-  };
+  const backendData = convertToBackendFormat(data as ProjectData);
+  const project = await prisma.project.update({ where: { id }, data: backendData as any });
+  return convertFromBackendFormat(project);
 };
 
 export const deleteProject = async (id: string) => {
@@ -70,9 +115,5 @@ export const deleteProject = async (id: string) => {
 
 export const getAllProjects = async () => {
   const projects = await prisma.project.findMany();
-  return projects.map((project: any) => ({
-    ...project,
-    fieldConfig: project.fieldConfig ? JSON.parse(project.fieldConfig) : { report_level: [], item_level: [] },
-    billingConfig: project.billingConfig ? JSON.parse(project.billingConfig) : {},
-  }));
+  return projects.map((project: any) => convertFromBackendFormat(project));
 };

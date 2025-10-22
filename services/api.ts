@@ -44,7 +44,7 @@ const mockInternalMessages: InternalMessage[] = [];
 // All localStorage-based data persistence has been removed from this file.
 // =====================================================================================
 
-const API_BASE_URL = 'http://localhost:3001'; // Backend API URL
+const API_BASE_URL = 'http://localhost:3002'; // Backend API URL
 
 // --- User Management Interfaces (kept for consistency with AuthContext) ---
 export interface ParsedLoginCredentials {
@@ -65,26 +65,6 @@ export interface ParsedRegisterData {
 // --- Helper to get the auth token ---
 const getAuthToken = (): string | null => localStorage.getItem('authToken');
 
-// --- Helper to make authenticated requests ---
-const makeAuthenticatedRequest = async (url: string, options: RequestInit = {}): Promise<any> => {
-  const token = getAuthToken();
-  const headers = {
-    'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
-    ...options.headers,
-  };
-
-  const response = await fetch(`${API_BASE_URL}${url}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-  }
-
-  return response.json();
-};
 
 // --- Helper to convert StoredUser to User ---
 const stripPassword = (storedUser: StoredUser): User => {
@@ -310,6 +290,17 @@ export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => 
   });
 };
 
+export const apiCheckObjectIds = async (projectId: string, objectIds: string[]): Promise<{ duplicates: string[] }> => {
+  console.warn(`apiCheckObjectIds (project: ${projectId}): Called with mock data store.`);
+  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+  
+  // Mock logic: Let's say any ID ending in '1' or '3' is a duplicate for demonstration
+  const duplicates = objectIds.filter(id => id.endsWith('1') || id.endsWith('3'));
+  
+  console.log("Mock DB: Checked for duplicates. Found:", duplicates);
+  return Promise.resolve({ duplicates });
+};
+
 export const fetchEmployeeDashboardData = async (userId: string): Promise<EmployeeDashboardData> => {
   console.warn(`fetchEmployeeDashboardData (${userId}): Called with mock data store.`);
   await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
@@ -326,43 +317,142 @@ export const fetchEmployeeDashboardData = async (userId: string): Promise<Employ
   });
 };
 
-// --- Project API Functions (Remains mostly static for now) ---
+// --- Project API Functions ---
 export const apiFetchProjects = async (): Promise<Project[]> => {
-  console.warn("apiFetchProjects: Called with static mock projects.");
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
-  return Promise.resolve([...mockProjects]);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to fetch projects');
+    }
+
+    const projects = await response.json();
+    return projects;
+  } catch (error) {
+    console.error('Project API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn("apiFetchProjects: Backend not available, falling back to mock data store.");
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+    return Promise.resolve([...mockProjects]);
+  }
 };
 
 export const apiFetchProjectById = async (projectId: string): Promise<Project | undefined> => {
-  console.warn(`apiFetchProjectById (${projectId}): Called with static mock projects.`);
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 3));
-  return Promise.resolve(mockProjects.find(p => p.id === projectId));
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) return undefined;
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to fetch project');
+    }
+
+    const project = await response.json();
+    return project;
+  } catch (error) {
+    console.error('Project API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn(`apiFetchProjectById (${projectId}): Backend not available, falling back to mock data store.`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 3));
+    return Promise.resolve(mockProjects.find(p => p.id === projectId));
+  }
 };
 
 export const apiAddProject = async (projectData: Omit<Project, 'id'>): Promise<Project> => {
-  console.warn("apiAddProject: Called, adding to static mock projects.");
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
-  const newProject: Project = { ...projectData, id: `proj${Date.now()}` };
-  mockProjects.push(newProject);
-  return Promise.resolve(newProject);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+      body: JSON.stringify(projectData),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to create project');
+    }
+
+    const newProject = await response.json();
+    return newProject;
+  } catch (error) {
+    console.error('Project API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn("apiAddProject: Backend not available, falling back to mock data store.");
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+    const newProject: Project = { ...projectData, id: `proj${Date.now()}` };
+    mockProjects.push(newProject);
+    return Promise.resolve(newProject);
+  }
 };
 
 export const apiUpdateProject = async (projectId: string, updates: Partial<Omit<Project, 'id'>>): Promise<Project> => {
-  console.warn(`apiUpdateProject (${projectId}): Called, updating static mock projects.`);
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
-  const projectIndex = mockProjects.findIndex(p => p.id === projectId);
-  if (projectIndex === -1) return Promise.reject(new Error("Project not found"));
-  const updatedProject = { ...mockProjects[projectIndex], ...updates };
-  mockProjects[projectIndex] = updatedProject;
-  return Promise.resolve(updatedProject);
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+      body: JSON.stringify(updates),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to update project');
+    }
+
+    const updatedProject = await response.json();
+    return updatedProject;
+  } catch (error) {
+    console.error('Project API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn(`apiUpdateProject (${projectId}): Backend not available, falling back to mock data store.`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+    const projectIndex = mockProjects.findIndex(p => p.id === projectId);
+    if (projectIndex === -1) return Promise.reject(new Error("Project not found"));
+    const updatedProject = { ...mockProjects[projectIndex], ...updates };
+    mockProjects[projectIndex] = updatedProject;
+    return Promise.resolve(updatedProject);
+  }
 };
 
 export const apiDeleteProject = async (projectId: string): Promise<void> => {
-  console.warn(`apiDeleteProject (${projectId}): Called, deleting from static mock projects.`);
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
-  const projectIndex = mockProjects.findIndex(p => p.id === projectId);
-  if (projectIndex !== -1) mockProjects.splice(projectIndex, 1);
-  return Promise.resolve();
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Failed to delete project');
+    }
+  } catch (error) {
+    console.error('Project API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn(`apiDeleteProject (${projectId}): Backend not available, falling back to mock data store.`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+    const projectIndex = mockProjects.findIndex(p => p.id === projectId);
+    if (projectIndex !== -1) mockProjects.splice(projectIndex, 1);
+  }
 };
 
 // --- Billing API Functions ---

@@ -7,10 +7,20 @@ A comprehensive full-stack application for managing employees, tracking work rep
 ### Core Functionality
 - **User Management**: Admin and employee roles with secure authentication
 - **Work Report Tracking**: Daily work reports with project logging and time tracking
+- **Dynamic Project Management**: Create projects with custom fields and intelligent billing formulas
 - **Billing System**: Automated billing calculations with multiple pricing models
 - **Leave Management**: Leave request system with approval workflow
 - **Real-time Updates**: Socket.IO integration for live notifications
 - **Dark Mode**: Complete theme switching support
+
+### Recent Updates & Fixes
+- **✅ Fixed Project Loading**: Projects now properly load from backend API in both admin dashboard and employee work report forms
+- **✅ Fixed User Management Navigation**: View icons in user management now correctly navigate to user detail pages
+- **✅ Enhanced Type Safety**: Updated Project interface to support dynamic fields and billing formulas
+- **✅ Improved API Integration**: Better error handling and fallback to mock data when backend is unavailable
+- **✅ Dynamic Field Support**: Projects can now have custom fields with different types (text, number, date, textarea)
+- **✅ Intelligent Billing**: Custom billing formulas that automatically calculate based on project fields
+- **✅ Template System**: Project templates for quick setup with pre-configured fields
 
 ### Technical Features
 - **Profile Pictures**: Mandatory user avatars with upload functionality

@@ -6,6 +6,7 @@ import { THEME, POSITIVE_MESSAGES } from '../../constants';
 import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../context/SocketContext';
 import { UsersIcon, UserGroupIcon, BriefcaseIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import ObjectIdRegistry from '../Admin/ObjectIdRegistry';
 
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; bgColorClass: string; textColorClass: string }> = ({ title, value, icon, bgColorClass, textColorClass }) => (
@@ -133,6 +134,11 @@ const AdminDashboard: React.FC = () => {
         ) : (
             <p className={`text-sm text-gray-500`}>No projects listed currently.</p>
         )}
+      </div>
+
+      {/* Object ID Registry Section */}
+      <div className={`mt-8`}>
+        <ObjectIdRegistry />
       </div>
 
     </div>
