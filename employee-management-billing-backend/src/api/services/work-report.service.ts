@@ -3,13 +3,15 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export interface WorkReportData {
-  projectId: string;
   userId: string;
   date: string;
-  objectId: string;
-  description?: string;
-  customFields: Record<string, any>;
-  hoursWorked?: number;
+  projectLogs: {
+    projectId: string;
+    hoursWorked?: number;
+    description?: string;
+    achievedCount?: number;
+    customFields: Record<string, any>;
+  }[];
   submittedAt: Date;
   status?: string;
   billingAmount?: number;
@@ -24,20 +26,32 @@ export interface WorkReportFilters {
 export class WorkReportService {
   async submitWorkReport(data: WorkReportData) {
     try {
+      if (data.projectLogs.length === 0) {
+        throw new Error('No project logs provided');
+      }
+
+      const projectId = data.projectLogs[0].projectId;
       // Get project details for billing calculation
       const project = await prisma.project.findUnique({
-        where: { id: data.projectId }
+        where: { id: projectId }
       });
 
       if (!project) {
         throw new Error('Project not found');
       }
 
-      // Calculate billing amount based on project formula
+      // Calculate billing amount based on all logs
       let billingAmount = 0;
       if (project.fieldConfig) {
         const config = JSON.parse(project.fieldConfig);
-        billingAmount = WorkReportService.calculateBilling(data.customFields, config.formula);
+        // Sum up all customFields
+        const allCustomFields = data.projectLogs.reduce((acc, log) => {
+          Object.entries(log.customFields).forEach(([key, value]) => {
+            acc[key] = (acc[key] || 0) + (typeof value === 'number' ? value : 0);
+          });
+          return acc;
+        }, {} as Record<string, any>);
+        billingAmount = WorkReportService.calculateBilling(allCustomFields, config.formula);
       }
 
       // Create work report
@@ -47,13 +61,13 @@ export class WorkReportService {
           date: new Date(data.date),
           submittedAt: data.submittedAt,
           projectLogItems: {
-            create: {
-              projectId: data.projectId,
+            create: data.projectLogs.map(log => ({
+              projectId: log.projectId,
               projectName: project.name,
-              hoursWorked: data.hoursWorked || 0,
-              description: data.description || '',
-              achievedCount: WorkReportService.extractAchievedCount(data.customFields),
-            }
+              hoursWorked: log.hoursWorked || 0,
+              description: log.description || '',
+              achievedCount: log.achievedCount || 0,
+            }))
           }
         },
         include: {
@@ -66,23 +80,22 @@ export class WorkReportService {
         await prisma.billingRecord.create({
           data: {
             userId: data.userId,
-            projectId: data.projectId,
+            projectId: projectId,
             projectName: project.name,
             calculatedAmount: billingAmount,
             date: new Date(data.date),
             status: 'PENDING',
             isCountBased: true,
-            achievedCountTotal: WorkReportService.extractAchievedCount(data.customFields),
-            details: data.customFields,
+            achievedCountTotal: data.projectLogs.reduce((sum, log) => sum + (log.achievedCount || 0), 0),
+            details: data.projectLogs.map(log => log.customFields),
           }
         } as any);
       }
 
       return {
         id: workReport.id,
-        projectId: data.projectId,
+        projectId: projectId,
         date: data.date,
-        objectId: data.objectId,
         billingAmount,
         status: 'SUBMITTED'
       };
@@ -130,18 +143,35 @@ export class WorkReportService {
         }
       });
 
-      return workReports.map(report => ({
-        id: report.id,
-        date: report.date,
-        submittedAt: report.submittedAt,
-        projectLogItems: report.projectLogItems.map(item => ({
-          id: item.id,
-          projectName: item.projectName,
-          hoursWorked: item.hoursWorked,
-          description: item.description,
-          achievedCount: item.achievedCount,
-        }))
-      }));
+      // Fetch billing records for the user
+      const billingRecords = await prisma.billingRecord.findMany({
+        where: {
+          userId,
+          date: {
+            gte: filters?.startDate || new Date(0),
+            lte: filters?.endDate || new Date(),
+          }
+        }
+      });
+
+      return workReports.map(report => {
+        // Find billing for this report
+        const billing = billingRecords.find(b => b.date.toISOString().split('T')[0] === report.date.toISOString().split('T')[0] && b.projectId === report.projectLogItems[0]?.projectId);
+
+        return {
+          id: report.id,
+          date: report.date,
+          submittedAt: report.submittedAt,
+          projectLogItems: report.projectLogItems.map(item => ({
+            id: item.id,
+            projectName: item.projectName,
+            hoursWorked: item.hoursWorked,
+            description: item.description,
+            achievedCount: item.achievedCount,
+            billing: billing ? { calculatedPay: billing.calculatedAmount } : undefined,
+          }))
+        };
+      });
     } catch (error) {
       console.error('Get work reports error:', error);
       throw error;

@@ -5,7 +5,8 @@ import {
   processFiles,
   calculateBilling,
   getWorkReports,
-  downloadWorkReport
+  downloadWorkReport,
+  adminProcessFiles
 } from '../controllers/work-report.controller';
 import { authenticateJWT } from '../middleware/auth.middleware';
 
@@ -53,5 +54,8 @@ router.get('/', getWorkReports);
 
 // Download work report
 router.get('/:reportId/download', downloadWorkReport);
+
+// Admin process files for multiple projects
+router.post('/admin-process-files', upload.array('files', 10), adminProcessFiles);
 
 export default router;

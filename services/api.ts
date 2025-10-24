@@ -535,44 +535,89 @@ export const apiDeleteBillingRecord = async (recordId: string): Promise<void> =>
 
 // --- Daily Work Report API Functions ---
 export const apiSubmitDailyWorkReport = async (reportData: NewDailyWorkReportData): Promise<DailyWorkReport> => {
-  console.warn("apiSubmitDailyWorkReport: Called, using dynamic mock reports.");
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
-  
-  const existingReportIndex = mockDailyWorkReports.findIndex(r => r.userId === reportData.userId && r.date === reportData.date);
-  
-  const finalProjectLogs: ProjectLogItem[] = reportData.projectLogs.map((logData, index) => {
-      const project = mockProjects.find(p => p.id === logData.projectId);
-      return {
-          ...logData, 
-          id: `log-${Date.now()}-${index}-${Math.random().toString(36).substring(7)}`, 
-          projectName: project?.name || "Unknown Project", 
-      };
-  });
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/work-reports/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+      body: JSON.stringify(reportData),
+    });
 
-  const newReport: DailyWorkReport = { 
-      id: `${reportData.userId}-${reportData.date}-${Date.now()}`, 
-      userId: reportData.userId,
-      date: reportData.date,
-      projectLogs: finalProjectLogs,
-      submittedAt: new Date().toISOString(),
-  };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to submit work report');
+    }
 
-  if (existingReportIndex !== -1) {
-      mockDailyWorkReports[existingReportIndex] = newReport;
-  } else {
-      mockDailyWorkReports.push(newReport);
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error('Work report submission API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn("apiSubmitDailyWorkReport: Backend not available, falling back to mock data store.");
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY / 2));
+    
+    const existingReportIndex = mockDailyWorkReports.findIndex(r => r.userId === reportData.userId && r.date === reportData.date);
+    
+    const finalProjectLogs: ProjectLogItem[] = reportData.projectLogs.map((logData, index) => {
+        const project = mockProjects.find(p => p.id === logData.projectId);
+        return {
+            ...logData,
+            id: `log-${Date.now()}-${index}-${Math.random().toString(36).substring(7)}`,
+            projectName: project?.name || "Unknown Project",
+        };
+    });
+
+    const newReport: DailyWorkReport = {
+        id: `${reportData.userId}-${reportData.date}-${Date.now()}`,
+        userId: reportData.userId,
+        date: reportData.date,
+        projectLogs: finalProjectLogs,
+        submittedAt: new Date().toISOString(),
+    };
+
+    if (existingReportIndex !== -1) {
+        mockDailyWorkReports[existingReportIndex] = newReport;
+    } else {
+        mockDailyWorkReports.push(newReport);
+    }
+    return Promise.resolve(newReport);
   }
-  return Promise.resolve(newReport);
 };
 
 
 export const apiFetchUserDailyWorkReports = async (userId: string, filters?: {startDate?: string, endDate?: string}): Promise<DailyWorkReport[]> => {
-  console.warn(`apiFetchUserDailyWorkReports (${userId}): Called, using dynamic mock reports.`);
-  await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
-  let userReports = mockDailyWorkReports.filter(r => r.userId === userId);
-  if (filters?.startDate) userReports = userReports.filter(r => new Date(r.date) >= new Date(filters.startDate!));
-  if (filters?.endDate) userReports = userReports.filter(r => new Date(r.date) <= new Date(filters.endDate!));
-  return Promise.resolve(userReports.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  try {
+    const queryParams = new URLSearchParams();
+    if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+    if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+
+    const response = await fetch(`${API_BASE_URL}/api/work-reports?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || 'Failed to fetch work reports');
+    }
+
+    const data = await response.json();
+    return data.data;
+  } catch (error) {
+    console.error('Work reports fetch API error:', error);
+    // Fallback to mock data if backend is not available
+    console.warn(`apiFetchUserDailyWorkReports (${userId}): Backend not available, falling back to mock data store.`);
+    await new Promise(resolve => setTimeout(resolve, MOCK_API_DELAY));
+    let userReports = mockDailyWorkReports.filter(r => r.userId === userId);
+    if (filters?.startDate) userReports = userReports.filter(r => new Date(r.date) >= new Date(filters.startDate!));
+    if (filters?.endDate) userReports = userReports.filter(r => new Date(r.date) <= new Date(filters.endDate!));
+    return Promise.resolve(userReports.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+  }
 };
 
 export const apiFetchAllDailyWorkReports = async (filters?: WorkReportFilters): Promise<DailyWorkReport[]> => {

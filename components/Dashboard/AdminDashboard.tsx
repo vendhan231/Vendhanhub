@@ -7,6 +7,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useSocket } from '../../context/SocketContext';
 import { UsersIcon, UserGroupIcon, BriefcaseIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
 import ObjectIdRegistry from '../Admin/ObjectIdRegistry';
+import AdminReportUpload from '../Admin/AdminReportUpload';
 
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; bgColorClass: string; textColorClass: string }> = ({ title, value, icon, bgColorClass, textColorClass }) => (
@@ -139,6 +140,11 @@ const AdminDashboard: React.FC = () => {
       {/* Object ID Registry Section */}
       <div className={`mt-8`}>
         <ObjectIdRegistry />
+      </div>
+
+      {/* Admin Report Upload Section */}
+      <div className={`mt-8`}>
+        <AdminReportUpload />
       </div>
 
     </div>

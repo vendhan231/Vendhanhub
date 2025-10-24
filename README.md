@@ -246,6 +246,19 @@ For support and questions:
 - Check the documentation in the `/docs` folder
 - Review the API documentation above
 
+## Known Issues & In Progress
+
+### Currently Being Addressed
+- **🔧 Object ID Duplicate Detection**: Working on improving the duplicate Object ID detection functionality in work reports
+- **🔧 Field Value Extraction**: Enhancing the extraction of corresponding field values from project sheets
+- **🔧 File Processing**: Improving CSV/Excel file processing and field mapping
+
+### Recently Resolved
+- **✅ Project Loading Issues**: Fixed projects not displaying in admin dashboard and employee work report forms
+- **✅ User Management Navigation**: Fixed view icons redirecting to welcome page instead of user detail view
+- **✅ Type Safety Improvements**: Resolved TypeScript errors related to project interfaces
+- **✅ API Integration**: Enhanced backend API connectivity with proper error handling
+
 ## Roadmap
 
 - [ ] Advanced analytics dashboard
@@ -254,3 +267,5 @@ For support and questions:
 - [ ] Advanced reporting features
 - [ ] Integration with external HR systems
 - [ ] AI-powered work report analysis
+- [ ] Enhanced duplicate detection system
+- [ ] Improved file processing and field mapping

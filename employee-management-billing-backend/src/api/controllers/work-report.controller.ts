@@ -5,12 +5,15 @@ import { FileProcessor, ProcessedFileData } from '../../utils/fileProcessor';
 
 // Validation schemas
 const submitWorkReportSchema = z.object({
-  projectId: z.string(),
+  userId: z.string(),
   date: z.string(),
-  objectId: z.string(),
-  description: z.string().optional(),
-  customFields: z.record(z.any()),
-  hoursWorked: z.number().optional(),
+  projectLogs: z.array(z.object({
+    projectId: z.string(),
+    hoursWorked: z.number().optional(),
+    description: z.string().optional(),
+    achievedCount: z.number().optional(),
+    customFields: z.record(z.any()),
+  })),
 });
 
 const processFilesSchema = z.object({
@@ -38,7 +41,7 @@ export const submitWorkReport = async (req: Request, res: Response) => {
       (global as any).io.emit('workReportSubmitted', {
         userId: user.id,
         userName: user.username,
-        projectId: validatedData.projectId,
+        projectId: validatedData.projectLogs[0]?.projectId,
         timestamp: new Date(),
       });
     }
@@ -210,6 +213,53 @@ export const downloadWorkReport = async (req: Request, res: Response) => {
     console.error('Download work report error:', error);
     res.status(500).json({
       error: 'Failed to download work report'
+    });
+  }
+};
+
+export const adminProcessFiles = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+
+    if (!user || user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const { projectIds } = req.body;
+    const files = (req as any).files;
+
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'No files provided' });
+    }
+
+    if (!projectIds || projectIds.length === 0) {
+      return res.status(400).json({ error: 'No projects selected' });
+    }
+
+    const processedResults: any[] = [];
+
+    for (const file of files) {
+      const result = await FileProcessor.processFile(file);
+
+      if (result.success && result.data) {
+        processedResults.push({
+          fileName: file.originalname,
+          data: result.data,
+          projectIds: projectIds,
+        });
+      } else {
+        console.error(`Failed to process file ${file.originalname}:`, result.error);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: processedResults,
+    });
+  } catch (error) {
+    console.error('Admin file processing error:', error);
+    res.status(400).json({
+      error: error instanceof Error ? error.message : 'Failed to process files'
     });
   }
 };
