@@ -4,30 +4,30 @@
 /* Custom color scheme using user's preferred colors */
 @layer base {
   :root {
-    --background: #DBDBDB;
-    --foreground: #706D54;
+    --background: #D0DDD0;
+    --foreground: #18230F;
     --card: #FFFFFF;
-    --card-foreground: #706D54;
+    --card-foreground: #18230F;
     --popover: #FFFFFF;
-    --popover-foreground: #706D54;
-    --primary: #706D54;
+    --popover-foreground: #18230F;
+    --primary: #727D73;
     --primary-foreground: #FFFFFF;
-    --secondary: #A08963;
+    --secondary: #AAB99A;
     --secondary-foreground: #FFFFFF;
-    --muted: #C9B194;
-    --muted-foreground: #706D54;
-    --accent: #C9B194;
-    --accent-foreground: #706D54;
+    --muted: #AAB99A;
+    --muted-foreground: #27391C;
+    --accent: #D0DDD0;
+    --accent-foreground: #18230F;
     --destructive: #ef4444;
     --destructive-foreground: #FFFFFF;
-    --border: #C9B194;
-    --input: #C9B194;
-    --ring: #706D54;
-    --chart-1: #706D54;
-    --chart-2: #A08963;
-    --chart-3: #C9B194;
-    --chart-4: #DBDBDB;
-    --chart-5: #9ca3af;
+    --border: #AAB99A;
+    --input: #D0DDD0;
+    --ring: #727D73;
+    --chart-1: #727D73;
+    --chart-2: #AAB99A;
+    --chart-3: #D0DDD0;
+    --chart-4: #255F38;
+    --chart-5: #1F7D53;
     --radius: 0.75rem;
   }
 
@@ -38,19 +38,19 @@
     --card-foreground: #f9fafb;
     --popover: #374151;
     --popover-foreground: #f9fafb;
-    --primary: #B7B89F;
-    --primary-foreground: #1f2937;
-    --secondary: #4b5563;
-    --secondary-foreground: #f9fafb;
-    --muted: #374151;
-    --muted-foreground: #d1d5db;
-    --accent: #4b5563;
-    --accent-foreground: #f9fafb;
+    --primary: #727D73;
+    --primary-foreground: #D0DDD0;
+    --secondary: #AAB99A;
+    --secondary-foreground: #D0DDD0;
+    --muted: #AAB99A;
+    --muted-foreground: #727D73;
+    --accent: #D0DDD0;
+    --accent-foreground: #727D73;
     --destructive: #ef4444;
     --destructive-foreground: #FFFFFF;
-    --border: #4b5563;
-    --input: #4b5563;
-    --ring: #B7B89F;
+    --border: #AAB99A;
+    --input: #D0DDD0;
+    --ring: #727D73;
   }
 }
 
@@ -74,19 +74,19 @@
 }
 
 .gradient-bg {
-  background: linear-gradient(135deg, #706D54 0%, #A08963 100%);
+  background: linear-gradient(135deg, #727D73 0%, #AAB99A 100%);
 }
 
 .gradient-bg-secondary {
-  background: linear-gradient(135deg, #A08963 0%, #C9B194 100%);
+  background: linear-gradient(135deg, #AAB99A 0%, #D0DDD0 100%);
 }
 
 .gradient-bg-success {
-  background: linear-gradient(135deg, #706D54 0%, #A08963 100%);
+  background: linear-gradient(135deg, #727D73 0%, #AAB99A 100%);
 }
 
 .gradient-bg-premium {
-  background: linear-gradient(135deg, #C9B194 0%, #DBDBDB 100%);
+  background: linear-gradient(135deg, #AAB99A 0%, #D0DDD0 100%);
 }
 
 .shadow-soft {
@@ -162,14 +162,14 @@
 .btn-premium {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #706D54 0%, #A08963 100%);
+  background: linear-gradient(135deg, #727D73 0%, #AAB99A 100%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 15px rgba(112, 109, 84, 0.3);
+  box-shadow: 0 4px 15px rgba(114, 125, 115, 0.3);
 }
 
 .btn-premium:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(112, 109, 84, 0.4);
+  box-shadow: 0 8px 25px rgba(114, 125, 115, 0.4);
 }
 
 .btn-premium:active {
@@ -192,8 +192,8 @@
 .card-premium {
   position: relative;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid #C9B194;
-  box-shadow: 0 2px 10px rgba(112, 109, 84, 0.1);
+  border: 1px solid #AAB99A;
+  box-shadow: 0 2px 10px rgba(114, 125, 115, 0.1);
 }
 
 .card-premium::before {
@@ -203,14 +203,14 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, #706D54, #A08963);
+  background: linear-gradient(90deg, #727D73, #AAB99A);
   opacity: 0;
   transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .card-premium:hover {
   transform: translateY(-4px);
-  box-shadow: 0 8px 25px rgba(112, 109, 84, 0.15);
+  box-shadow: 0 8px 25px rgba(114, 125, 115, 0.15);
 }
 
 .card-premium:hover::before {
@@ -219,19 +219,19 @@
 
 .input-premium {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 2px solid #C9B194;
+  border: 2px solid #AAB99A;
   background: rgba(255, 255, 255, 0.9);
 }
 
 .input-premium:focus {
-  border-color: #706D54;
+  border-color: #727D73;
   background: #FFFFFF;
-  box-shadow: 0 0 0 3px rgba(112, 109, 84, 0.1);
+  box-shadow: 0 0 0 3px rgba(114, 125, 115, 0.1);
   transform: translateY(-1px);
 }
 
 .header-gradient {
-  background: linear-gradient(135deg, #706D54 0%, #A08963 100%);
+  background: linear-gradient(135deg, #727D73 0%, #AAB99A 100%);
   position: relative;
 }
 
@@ -256,11 +256,11 @@
 }
 
 .shadow-premium {
-  box-shadow: 0 4px 20px rgba(112, 109, 84, 0.12);
+  box-shadow: 0 4px 20px rgba(114, 125, 115, 0.12);
 }
 
 .shadow-premium-lg {
-  box-shadow: 0 8px 30px rgba(112, 109, 84, 0.15);
+  box-shadow: 0 8px 30px rgba(114, 125, 115, 0.15);
 }
 
 .animate-fade-in-up {

@@ -19,7 +19,8 @@ import {
   Clock,
   Users,
   FolderOpen,
-  BarChart3
+  BarChart3,
+  Upload
 } from 'lucide-react';
 
 interface ObjectIdEntry {
@@ -79,6 +80,9 @@ const ObjectIdRegistry: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [historyData, setHistoryData] = useState<ObjectIdHistory | null>(null);
+  const [uploadModalOpen, setUploadModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [projects, setProjects] = useState<Array<{id: string, name: string, billingType?: string, ratePerHour?: number}>>([]);
   const [users, setUsers] = useState<Array<{id: string, username: string, fullName: string, department?: string}>>([]);
 
@@ -189,6 +193,48 @@ const ObjectIdRegistry: React.FC = () => {
     toast.success('Bulk delete functionality coming soon');
   };
 
+  const handleFileUpload = async () => {
+    if (!selectedFile) {
+      toast.error('Please select a file to upload');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/object-ids/upload`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        toast.success(`Successfully uploaded ${result.uploadedCount} Object ID entries`);
+        setUploadModalOpen(false);
+        setSelectedFile(null);
+        loadStats();
+        loadEntries();
+      } else {
+        const error = await response.json();
+        toast.error(error.message || 'Failed to upload Object ID registry');
+        if (error.errors && error.errors.length > 0) {
+          console.error('Upload errors:', error.errors);
+          // Could show detailed errors in a separate modal if needed
+        }
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast.error('Failed to upload Object ID registry');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -207,6 +253,10 @@ const ObjectIdRegistry: React.FC = () => {
               </CardDescription>
             </div>
             <div className="flex items-center gap-3">
+              <Button variant="outline" onClick={() => setUploadModalOpen(true)}>
+                <Upload className="w-4 h-4 mr-2" />
+                Upload
+              </Button>
               <Button variant="outline" onClick={handleExport}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
@@ -482,6 +532,58 @@ const ObjectIdRegistry: React.FC = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Upload Modal */}
+      <Dialog open={uploadModalOpen} onOpenChange={setUploadModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload Object ID Registry</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file containing Object ID entries to bulk import into the registry.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="file-upload">Select CSV File</Label>
+              <Input
+                id="file-upload"
+                type="file"
+                accept=".csv"
+                className="cursor-pointer"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              />
+              <p className="text-sm text-muted-foreground">
+                CSV should contain columns: objectId, projectId, userId, reportId
+              </p>
+              {selectedFile && (
+                <p className="text-sm text-green-600">
+                  Selected: {selectedFile.name}
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setUploadModalOpen(false);
+                  setSelectedFile(null);
+                }}
+                disabled={uploading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleFileUpload}
+                disabled={!selectedFile || uploading}
+              >
+                {uploading ? 'Uploading...' : 'Upload'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* History Modal */}
       <Dialog open={historyModalOpen} onOpenChange={setHistoryModalOpen}>

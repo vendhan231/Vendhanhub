@@ -362,6 +362,131 @@ export const getObjectIdStats = async (req: any, res: any) => {
   }
 };
 
+// Bulk upload Object ID entries from CSV (admin only)
+export const bulkUploadObjectIds = async (req: any, res: any) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const csvData = req.file.buffer.toString('utf-8');
+    const lines = csvData.split('\n').filter((line: string) => line.trim());
+
+    if (lines.length < 2) {
+      return res.status(400).json({ message: 'CSV file must contain at least a header row and one data row' });
+    }
+
+    const headers = lines[0].split(',').map((h: string) => h.trim().toLowerCase());
+    const requiredHeaders = ['objectid', 'projectid', 'userid', 'reportid'];
+
+    const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
+    if (missingHeaders.length > 0) {
+      return res.status(400).json({
+        message: `Missing required columns: ${missingHeaders.join(', ')}`
+      });
+    }
+
+    const objectIdIndex = headers.indexOf('objectid');
+    const projectIdIndex = headers.indexOf('projectid');
+    const userIdIndex = headers.indexOf('userid');
+    const reportIdIndex = headers.indexOf('reportid');
+
+    const entries = [];
+    const errors = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map((v: string) => v.trim());
+
+      if (values.length !== headers.length) {
+        errors.push(`Row ${i + 1}: Incorrect number of columns`);
+        continue;
+      }
+
+      const objectId = values[objectIdIndex];
+      const projectId = values[projectIdIndex];
+      const userId = values[userIdIndex];
+      const reportId = values[reportIdIndex];
+
+      if (!objectId || !projectId || !userId || !reportId) {
+        errors.push(`Row ${i + 1}: Missing required values`);
+        continue;
+      }
+
+      // Validate that project, user, and report exist
+      try {
+        const [project, user, report] = await Promise.all([
+          prisma.project.findUnique({ where: { id: projectId } }),
+          prisma.user.findUnique({ where: { id: userId } }),
+          prisma.report.findUnique({ where: { id: reportId } })
+        ]);
+
+        if (!project) {
+          errors.push(`Row ${i + 1}: Project ID ${projectId} not found`);
+          continue;
+        }
+        if (!user) {
+          errors.push(`Row ${i + 1}: User ID ${userId} not found`);
+          continue;
+        }
+        if (!report) {
+          errors.push(`Row ${i + 1}: Report ID ${reportId} not found`);
+          continue;
+        }
+
+        entries.push({
+          objectId,
+          projectId,
+          userId,
+          reportId
+        });
+      } catch (validationError: any) {
+        errors.push(`Row ${i + 1}: Validation error - ${validationError.message}`);
+      }
+    }
+
+    if (entries.length === 0) {
+      return res.status(400).json({
+        message: 'No valid entries found to upload',
+        errors
+      });
+    }
+
+    // Insert entries individually to handle duplicates properly
+    let uploadedCount = 0;
+    const duplicateErrors: string[] = [];
+
+    for (const entry of entries) {
+      try {
+        await prisma.objectIDIndex.create({
+          data: entry
+        });
+        uploadedCount++;
+      } catch (error: any) {
+        // Check if it's a duplicate key error
+        if (error.code === 'P2002') {
+          duplicateErrors.push(`Object ID ${entry.objectId} already exists`);
+        } else {
+          errors.push(`Failed to create entry for Object ID ${entry.objectId}: ${error.message}`);
+        }
+      }
+    }
+
+    // Add duplicate warnings to errors if any
+    if (duplicateErrors.length > 0) {
+      errors.push(...duplicateErrors);
+    }
+
+    res.status(200).json({
+      message: `Successfully uploaded ${uploadedCount} Object ID entries`,
+      uploadedCount,
+      errors: errors.length > 0 ? errors : undefined
+    });
+  } catch (error: any) {
+    console.error('Error bulk uploading Object IDs:', error);
+    res.status(500).json({ message: 'Failed to bulk upload Object IDs' });
+  }
+};
+
 // Bulk delete Object ID entries (admin only)
 export const bulkDeleteObjectIds = async (req: any, res: any) => {
   try {

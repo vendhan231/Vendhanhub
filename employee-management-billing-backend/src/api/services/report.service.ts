@@ -129,6 +129,7 @@ export const createReport = async (data: ReportData) => {
   // Create billing record
   const billing = await prisma.billingRecord.create({
     data: {
+      reportId: report.id,
       userId,
       projectId,
       projectName: project.name, // project is guaranteed to exist from earlier check
@@ -174,6 +175,7 @@ export const getReports = async (userId?: string, projectId?: string) => {
       user: true,
       project: true,
       items: true,
+      billingRecords: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -182,6 +184,7 @@ export const getReports = async (userId?: string, projectId?: string) => {
     ...report,
     reportData: JSON.parse(report.reportData),
     items: report.items.map(item => JSON.parse(item.itemData)),
+    billingRecords: report.billingRecords,
   }));
 };
 
@@ -192,6 +195,7 @@ export const getReportById = async (id: string) => {
       user: true,
       project: true,
       items: true,
+      billingRecords: true,
     },
   });
 
@@ -201,6 +205,7 @@ export const getReportById = async (id: string) => {
     ...report,
     reportData: JSON.parse(report.reportData),
     items: report.items.map(item => JSON.parse(item.itemData)),
+    billingRecords: report.billingRecords,
   };
 };
 

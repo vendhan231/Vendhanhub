@@ -318,6 +318,7 @@ const PasteDataModal: React.FC<PasteDataModalProps> = ({
             <Card>
               <CardHeader><CardTitle>Validation Summary</CardTitle></CardHeader>
               <CardContent className="flex justify-around">
+                <div className="text-center"><p className="text-2xl font-bold text-green-600">{validationResults.totalRows}</p><p className="text-sm text-muted-foreground">Total Rows</p></div>
                 <div className="text-center"><p className="text-2xl font-bold text-green-600">{validationResults.valid}</p><p className="text-sm text-muted-foreground">Valid Rows</p></div>
                 <div className="text-center"><p className="text-2xl font-bold text-yellow-600">{validationResults.warnings}</p><p className="text-sm text-muted-foreground">Warnings</p></div>
                 <div className="text-center"><p className="text-2xl font-bold text-red-600">{validationResults.errors}</p><p className="text-sm text-muted-foreground">Errors</p></div>

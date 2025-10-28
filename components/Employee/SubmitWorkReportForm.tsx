@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import PasteDataModal from "./PasteDataModal";
+import * as XLSX from 'xlsx';
 import {
   FileText,
   Calculator,
@@ -197,6 +198,9 @@ const SubmitWorkReportForm = () => {
       objects: [{ id: `item-${Date.now()}`, objectId: "", customFields: {} }],
       hoursWorked: project?.billingType === 'hourly' ? prev.hoursWorked : undefined,
     }));
+    // Clear processed data when project changes
+    setProcessedData([]);
+    setUploadedFiles([]);
   };
 
   // Handle file upload
@@ -208,30 +212,105 @@ const SubmitWorkReportForm = () => {
 
   // Process uploaded files
   const processFiles = async (files: File[]) => {
+    if (!selectedProject) {
+      toast.error("Please select a project first");
+      return;
+    }
+
     setProcessingFiles(true);
 
     try {
       const processedResults: ProcessedFileData[] = [];
 
       for (const file of files) {
-        // Mock file processing - replace with actual parsing logic
-        const mockProcessedData: ProcessedFileData = {
-          fileName: file.name,
-          objectIds: ["OBJ001", "OBJ002", "OBJ003", "OBJ001"], // Mock data with duplicate
-          extractedFields: [
-            { Object_ID: "OBJ001", CharacterCount: 1500, Description: "Sample content 1" },
-            { Object_ID: "OBJ002", CharacterCount: 2300, Description: "Sample content 2" },
-            { Object_ID: "OBJ003", CharacterCount: 1800, Description: "Sample content 3" },
-            { Object_ID: "OBJ001", CharacterCount: 1500, Description: "Duplicate content" },
-          ],
-          duplicates: ["OBJ001"],
-          totalRecords: 4,
-        };
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+          // Process Excel files
+          const arrayBuffer = await file.arrayBuffer();
+          const workbook = XLSX.read(arrayBuffer, { type: 'array' });
 
-        processedResults.push(mockProcessedData);
+          // Get all sheet names
+          const sheetNames = workbook.SheetNames;
+
+          // Find sheet that matches the selected project name
+          const projectSheet = sheetNames.find(sheetName =>
+            sheetName.toLowerCase() === selectedProject.name.toLowerCase()
+          );
+
+          if (!projectSheet) {
+            toast.warning(`No sheet named "${selectedProject.name}" found in ${file.name}. Available sheets: ${sheetNames.join(', ')}`);
+            continue;
+          }
+
+          const worksheet = workbook.Sheets[projectSheet];
+          const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          if (jsonData.length === 0) continue;
+
+          // Assume first row is headers
+          const headers = jsonData[0] as string[];
+          const rows = jsonData.slice(1) as any[][];
+
+          // Map rows to objects
+          const extractedFields = rows.map(row => {
+            const obj: any = {};
+            headers.forEach((header, index) => {
+              obj[header] = row[index] || '';
+            });
+            return obj;
+          });
+
+          // Extract Object_IDs
+          const objectIds = extractedFields
+            .map(row => row.Object_ID || row.objectId || row.ID || row.id)
+            .filter(id => id);
+
+          // Find duplicates within this sheet
+          const duplicates = objectIds.filter((id, index) => objectIds.indexOf(id) !== index);
+
+          const processedData: ProcessedFileData = {
+            fileName: `${file.name} - ${projectSheet}`,
+            objectIds,
+            extractedFields,
+            duplicates: [...new Set(duplicates)],
+            totalRecords: extractedFields.length,
+          };
+
+          processedResults.push(processedData);
+        } else if (file.name.endsWith('.csv')) {
+          // Process CSV files using PapaParse
+          const text = await file.text();
+          const Papa = await import('papaparse');
+          const parsed = Papa.default.parse(text, { header: true, skipEmptyLines: true });
+
+          const extractedFields = parsed.data as any[];
+          const objectIds = extractedFields
+            .map(row => row.Object_ID || row.objectId || row.ID || row.id)
+            .filter(id => id);
+
+          const duplicates = objectIds.filter((id, index) => objectIds.indexOf(id) !== index);
+
+          const processedData: ProcessedFileData = {
+            fileName: file.name,
+            objectIds,
+            extractedFields,
+            duplicates: [...new Set(duplicates)],
+            totalRecords: extractedFields.length,
+          };
+
+          processedResults.push(processedData);
+        } else {
+          toast.warning(`Unsupported file type: ${file.name}`);
+          continue;
+        }
       }
 
       setProcessedData(processedResults);
+
+      // Load extracted data into form objects
+      if (processedResults.length > 0) {
+        const allExtractedData = processedResults.flatMap(p => p.extractedFields);
+        loadExtractedDataIntoForm(allExtractedData);
+      }
 
       // Check for duplicates across all files
       const allObjectIds = processedResults.flatMap(p => p.objectIds);
@@ -244,10 +323,78 @@ const SubmitWorkReportForm = () => {
         });
       }
     } catch (error) {
+      console.error('File processing error:', error);
       toast.error("Failed to process files");
     } finally {
       setProcessingFiles(false);
     }
+  };
+
+  // Load extracted data into form objects
+  const loadExtractedDataIntoForm = (extractedData: any[]) => {
+    const newObjects = extractedData.map((row, index) => {
+      const customFields: Record<string, any> = {};
+
+      // Map Excel columns to project fields
+      if (selectedProject?.item_fields) {
+        selectedProject.item_fields.forEach(field => {
+          // Try different possible column names
+          const possibleKeys = [
+            field.label,
+            field.label.replace(/\s+/g, '_'),
+            field.label.replace(/\s+/g, ''),
+            field.label.toLowerCase(),
+            field.label.toLowerCase().replace(/\s+/g, '_'),
+            field.label.toLowerCase().replace(/\s+/g, ''),
+            // Also try common variations
+            'CharacterCount', 'RecordCount', 'Count', 'Qty', 'Quantity'
+          ];
+
+          let value = '';
+          for (const key of possibleKeys) {
+            if (row[key] !== undefined && row[key] !== null && row[key] !== '') {
+              value = row[key];
+              break;
+            }
+          }
+
+          // Handle date fields
+          if (field.type === 'date' && value) {
+            try {
+              const date = new Date(value);
+              if (!isNaN(date.getTime())) {
+                value = date.toISOString().split('T')[0];
+              }
+            } catch (e) {
+              // Keep original value if parsing fails
+            }
+          }
+
+          customFields[field.label] = value;
+        });
+      }
+
+      // Extract Object_ID
+      const objectId = row.Object_ID || row.objectId || row.ID || row.id || `AUTO_${index + 1}`;
+
+      return {
+        id: `extracted-${Date.now()}-${index}`,
+        objectId: objectId.toString(),
+        customFields
+      };
+    });
+
+    setFormData(prev => ({
+      ...prev,
+      objects: [...prev.objects, ...newObjects]
+    }));
+
+    toast.success(`Loaded ${newObjects.length} records from file`);
+
+    // Trigger billing calculation after loading data
+    setTimeout(() => {
+      calculateBilling();
+    }, 100);
   };
 
   // Handle duplicate resolution
@@ -271,17 +418,28 @@ const SubmitWorkReportForm = () => {
 
   // Calculate billing
   const calculateBilling = () => {
-    if (!selectedProject || !selectedProject.billing_formula || !selectedProject.item_fields) return;
+    if (!selectedProject || !selectedProject.billing_formula || !selectedProject.item_fields) {
+      console.log('Missing project data for billing calculation:', { selectedProject, billing_formula: selectedProject?.billing_formula, item_fields: selectedProject?.item_fields });
+      return;
+    }
 
     try {
       let totalBilling = 0;
-      formData.objects.forEach(object => {
+      let validObjects = 0;
+
+      formData.objects.forEach((object, index) => {
+        if (!object.objectId) return; // Skip objects without ID
+
         let formula = selectedProject.billing_formula!;
+        let hasValidData = false;
 
         selectedProject.item_fields!.forEach(field => {
           if (field.type === 'number') {
             const value = object.customFields[field.label] || 0;
-            formula = formula!.replace(new RegExp(field.label, 'g'), value.toString());
+            if (value !== 0 && value !== '' && value !== null && value !== undefined) {
+              hasValidData = true;
+            }
+            formula = formula.replace(new RegExp(field.label, 'g'), value.toString());
           } else if (field.type === 'date') {
             // For date fields, you might want to calculate days, age, etc.
             // For now, we'll skip them in calculations unless specifically needed
@@ -289,19 +447,34 @@ const SubmitWorkReportForm = () => {
             if (dateValue) {
               // Example: convert to days since epoch or extract day/month
               // This is just a placeholder - actual implementation depends on requirements
-              formula = formula!.replace(new RegExp(field.label, 'g'), '0');
+              formula = formula.replace(new RegExp(field.label, 'g'), '0');
             }
           }
           // Text and textarea fields are not used in numerical calculations
         });
 
-        const result = new Function('return ' + formula)();
-        totalBilling += Number(result) || 0;
+        if (hasValidData) {
+          try {
+            const result = new Function('return ' + formula)();
+            const numericResult = Number(result);
+            if (!isNaN(numericResult)) {
+              totalBilling += numericResult;
+              validObjects++;
+            }
+          } catch (formulaError) {
+            console.error(`Error calculating formula for object ${index}:`, formulaError);
+          }
+        }
       });
 
       setCalculationResult(totalBilling);
-      toast.success(`Calculated Total: ₹${totalBilling.toFixed(2)}`);
+      if (totalBilling > 0) {
+        toast.success(`Calculated Total: ₹${totalBilling.toFixed(2)} (${validObjects} objects)`);
+      } else {
+        toast.warning("No valid billing data found. Check if numeric fields are populated.");
+      }
     } catch (error) {
+      console.error('Billing calculation error:', error);
       toast.error("Invalid formula or missing values in one of the objects");
       setCalculationResult(0);
     }
@@ -336,8 +509,9 @@ const SubmitWorkReportForm = () => {
 
     try {
       if (!user) throw new Error("User not authenticated");
-      // Prepare projectLogs from both manually entered objects and processed file data
-      const manualLogs = formData.objects
+
+      // Prepare projectLogs from form objects (includes both manual and extracted data)
+      const projectLogs = formData.objects
         .filter(obj => obj.objectId) // only include objects with an ID
         .map(obj => {
           return {
@@ -351,24 +525,16 @@ const SubmitWorkReportForm = () => {
           };
         });
 
-      const fileLogs = processedData.flatMap(file => file.extractedFields.map(row => ({
-        id: row.Object_ID || row.id || Math.random().toString(36),
-        projectId: formData.projectId,
-        projectName: selectedProject?.name || '',
-        hoursWorked: row.HoursWorked || 0,
-        description: row.Description || '',
-        achievedCount: row.CharacterCount || row.RecordCount || undefined,
-        customFields: row,
-      })));
-
-      const projectLogs = [...manualLogs, ...fileLogs];
       const reportData = {
         userId: user.id,
         date: formData.date,
         projectLogs,
       };
+
       await apiSubmitDailyWorkReport(reportData);
       toast.success("Work report submitted successfully!");
+
+      // Reset form
       setFormData({
         projectId: "",
         date: new Date().toISOString().split('T')[0],
@@ -391,6 +557,11 @@ const SubmitWorkReportForm = () => {
   const removeFile = (index: number) => {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
     setProcessedData(prev => prev.filter((_, i) => i !== index));
+    // Remove extracted objects from form
+    setFormData(prev => ({
+      ...prev,
+      objects: prev.objects.filter(obj => !obj.id.includes(`extracted-${index}`))
+    }));
   };
 
   return (
@@ -419,7 +590,7 @@ const SubmitWorkReportForm = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
+                    <SelectItem key={project.id} value={project.id} className="font-semibold bg-primary/10 text-primary">
                       {project.name} ({project.billingType})
                     </SelectItem>
                   ))}
@@ -640,15 +811,33 @@ const SubmitWorkReportForm = () => {
               {processedData.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <Label className="text-base font-semibold">Processed Data</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setShowPreview(!showPreview)}
-                    >
-                      <Eye className="w-4 h-4 mr-2" />
-                      {showPreview ? 'Hide' : 'Preview'}
-                    </Button>
+                    <Label className="text-base font-semibold">Extracted Data from File</Label>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowPreview(!showPreview)}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        {showPreview ? 'Hide' : 'Preview'}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="default"
+                        onClick={() => {
+                          const extractedObjects = formData.objects.filter(obj => obj.id.startsWith('extracted-'));
+                          if (extractedObjects.length === 0) {
+                            toast.error("No extracted data to submit");
+                            return;
+                          }
+                          handleSubmit({ preventDefault: () => {} } as any);
+                        }}
+                        disabled={submitting}
+                      >
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Submit Extracted Data
+                      </Button>
+                    </div>
                   </div>
 
                   {showPreview && (
@@ -658,7 +847,7 @@ const SubmitWorkReportForm = () => {
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold">{data.fileName}</h4>
                             <span className="text-sm text-muted-foreground">
-                              {data.totalRecords} records
+                              {data.totalRecords} records loaded
                             </span>
                           </div>
 
@@ -675,6 +864,24 @@ const SubmitWorkReportForm = () => {
                             Object IDs: {data.objectIds.slice(0, 5).join(', ')}
                             {data.objectIds.length > 5 && ` +${data.objectIds.length - 5} more`}
                           </div>
+
+                          {/* Show first few extracted records */}
+                          {data.extractedFields.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-sm font-medium mb-2">Sample Records:</p>
+                              <div className="space-y-1 max-h-32 overflow-y-auto">
+                                {data.extractedFields.slice(0, 3).map((record, idx) => (
+                                  <div key={idx} className="text-xs bg-muted p-2 rounded">
+                                    {Object.entries(record).slice(0, 4).map(([key, value]) => (
+                                      <span key={key} className="mr-2">
+                                        <strong>{key}:</strong> {String(value).substring(0, 20)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </Card>
                       ))}
                     </div>
@@ -714,6 +921,27 @@ const SubmitWorkReportForm = () => {
                 <Eye className="w-4 h-4 mr-2" />
                 Preview
               </Button>
+
+              {formData.objects.length > 1 && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-12 px-6"
+                  onClick={() => {
+                    const pastedObjects = formData.objects.filter(obj => obj.objectId);
+                    if (pastedObjects.length === 0) {
+                      toast.error("No pasted data to commit");
+                      return;
+                    }
+                    // Auto-submit the pasted data
+                    handleSubmit({ preventDefault: () => {} } as any);
+                  }}
+                  disabled={submitting || !selectedProject}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Commit Pasted Data
+                </Button>
+              )}
             </div>
           </form>
         </CardContent>
