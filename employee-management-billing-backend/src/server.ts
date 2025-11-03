@@ -21,6 +21,7 @@ import billingRoutes from './api/routes/billing.routes';
 import healthRoutes from './api/routes/health.routes';
 import userDetailRoutes from './api/routes/user-detail.routes';
 import objectIdRoutes from './api/routes/object-id.routes';
+import auditRoutes from './api/routes/audit.routes';
 import errorMiddleware from './api/middleware/error.middleware';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
@@ -84,7 +85,7 @@ const authLimiter = rateLimit({
   message: 'Too many attempts, please try again later.'
 });
 
-app.use('/health', healthRoutes);
+app.use('/', healthRoutes);
 app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 app.use('/projects', projectRoutes);
@@ -101,6 +102,7 @@ app.use('/upload', uploadRoutes);
 app.use('/billing', billingRoutes);
 app.use('/api/user-details', userDetailRoutes);
 app.use('/api/object-ids', objectIdRoutes);
+app.use('/api/audit', auditRoutes);
 
 app.use('/auth/login', authLimiter);
 app.use('/auth/register', authLimiter);

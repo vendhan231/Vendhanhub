@@ -4,6 +4,7 @@
   "description": "A backend system for managing employees and billing records.",
   "main": "src/server.ts",
   "scripts": {
+     "db:create-admin": "ts-node scripts/createAdmin.ts",
     "dev": "ts-node-dev src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
@@ -60,6 +61,7 @@
     "billing",
     "backend"
   ],
+ 
   "author": "Your Name",
   "license": "MIT"
 }

@@ -372,7 +372,7 @@ const PasteDataModal: React.FC<PasteDataModalProps> = ({
             </div>
             <div className="flex justify-end gap-2 mt-4">
               <Button variant="outline" onClick={() => setActiveTab('mapping')}>Back</Button>
-              <Button onClick={insertData} disabled={validationResults.errors > 0}><CheckCircle className="w-4 h-4 mr-2" />Insert {validationResults.valid} Items</Button>
+              <Button onClick={insertData} disabled={validationResults.errors > 0}><CheckCircle className="w-4 h-4 mr-2" />Submit Results</Button>
             </div>
           </TabsContent>
 

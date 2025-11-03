@@ -27,9 +27,10 @@ export type StoredUser = User & {
 export interface AdminDashboardData {
   totalEmployees: number;
   activeUsers: number;
-  presentToday: number; 
-  absentToday: number;  
-  projects: Project[]; 
+  presentToday: number;
+  absentToday: number;
+  totalEarnings: number;
+  projects: Project[];
 }
 
 export interface EmployeeDashboardData {

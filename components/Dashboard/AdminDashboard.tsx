@@ -49,7 +49,7 @@ const AdminDashboard: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-        const adminData = await fetchAdminDashboardData(); 
+        const adminData = await fetchAdminDashboardData();
         setData(adminData);
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard data.');
@@ -89,33 +89,40 @@ const AdminDashboard: React.FC = () => {
         <p className={`text-md text-${THEME.accentText} -mt-2 mb-4`}>{positiveMessage}</p>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard 
-            title="Total Employees" 
-            value={data.totalEmployees} 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-5 gap-6">
+        <StatCard
+            title="Total Employees"
+            value={data.totalEmployees}
             icon={<UserGroupIcon className="h-8 w-8" />}
             bgColorClass={`bg-${THEME.primary}`}
             textColorClass={`text-${THEME.primaryText}`}
         />
-        <StatCard 
-            title="Active Users" 
-            value={data.activeUsers} 
+        <StatCard
+            title="Active Users"
+            value={data.activeUsers}
             icon={<UsersIcon className="h-8 w-8" />}
             bgColorClass={`bg-${THEME.secondary}`}
             textColorClass={`text-${THEME.secondaryText}`}
         />
-        <StatCard 
-            title="Present Today" 
-            value={data.presentToday} 
+        <StatCard
+            title="Present Today"
+            value={data.presentToday}
             icon={<UserPlusIcon className="h-8 w-8" />}
             bgColorClass={`bg-blue-500`}
             textColorClass={`text-white`}
         />
-        <StatCard 
-            title="Absent Today" 
-            value={data.absentToday} 
+        <StatCard
+            title="Absent Today"
+            value={data.absentToday}
             icon={<UserMinusIcon className="h-8 w-8" />}
             bgColorClass={`bg-orange-500`}
+            textColorClass={`text-white`}
+        />
+        <StatCard
+            title="Total Earnings"
+            value={`₹${data.totalEarnings?.toLocaleString('en-IN') || '0'}`}
+            icon={<BriefcaseIcon className="h-8 w-8" />}
+            bgColorClass={`bg-green-500`}
             textColorClass={`text-white`}
         />
       </div>

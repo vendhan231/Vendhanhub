@@ -9,6 +9,7 @@ import {
   adminProcessFiles
 } from '../controllers/work-report.controller';
 import { authenticateJWT } from '../middleware/auth.middleware';
+import { auditReportActivity } from '../middleware/audit.middleware';
 
 const router = Router();
 
@@ -41,7 +42,7 @@ const upload = multer({
 router.use(authenticateJWT);
 
 // Submit work report
-router.post('/submit', submitWorkReport);
+router.post('/submit', auditReportActivity, submitWorkReport);
 
 // Process uploaded files
 router.post('/process-files', upload.array('files', 10), processFiles);
