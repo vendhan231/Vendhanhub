@@ -10,7 +10,7 @@ CREATE TABLE "User" (
     "profilePictureUrl" TEXT,
     "phone" TEXT,
     "department" TEXT,
-    "joinDate" DATETIME NOT NULL,
+    "joinDate" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -24,6 +24,10 @@ CREATE TABLE "Project" (
     "countMetricLabel" TEXT,
     "countDivisor" INTEGER DEFAULT 1,
     "countMultiplier" DECIMAL,
+    "fieldConfig" TEXT,
+    "billingConfig" TEXT,
+    "is_active" BOOLEAN DEFAULT true,
+    "description" TEXT,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL
 );
@@ -84,8 +88,29 @@ CREATE TABLE "AttendanceRecord" (
 );
 
 -- CreateTable
+CREATE TABLE "Report" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "projectId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "reportData" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL,
+    CONSTRAINT "Report_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT "Report_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ReportItem" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "reportId" TEXT NOT NULL,
+    "itemData" TEXT NOT NULL,
+    CONSTRAINT "ReportItem_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "Report" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "BillingRecord" (
     "id" TEXT NOT NULL PRIMARY KEY,
+    "reportId" TEXT,
     "userId" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "projectName" TEXT,
@@ -104,8 +129,23 @@ CREATE TABLE "BillingRecord" (
     "billingPeriodEndDate" DATETIME,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
+    "details" TEXT,
     CONSTRAINT "BillingRecord_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "BillingRecord_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "BillingRecord_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "BillingRecord_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "Report" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ObjectIDIndex" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "objectId" TEXT NOT NULL,
+    "reportId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "ObjectIDIndex_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "ObjectIDIndex_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "ObjectIDIndex_reportId_fkey" FOREIGN KEY ("reportId") REFERENCES "Report" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -154,3 +194,6 @@ CREATE UNIQUE INDEX "DailyWorkReport_userId_date_key" ON "DailyWorkReport"("user
 
 -- CreateIndex
 CREATE UNIQUE INDEX "AttendanceRecord_userId_date_key" ON "AttendanceRecord"("userId", "date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ObjectIDIndex_objectId_projectId_key" ON "ObjectIDIndex"("objectId", "projectId");

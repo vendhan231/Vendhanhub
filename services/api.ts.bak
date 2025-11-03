@@ -1,0 +1,871 @@
+
+import { User, UserRole, AdminDashboardData, EmployeeDashboardData, StoredUser, BillingRecord, BillingStatus, Project, DailyWorkReport, NewDailyWorkReportData, LeaveRequest, LeaveStatus, NewLeaveRequestData, EmployeeProfileUpdateData, AttendanceRecord, UserAttendanceStatus, AdminUserUpdateData, InternalMessage, WorkReportFilters, ChangePasswordData, ProjectLogItem } from '../types';
+import { MOCK_API_DELAY } from '../constants';
+import { calculateDecimalHours, formatDate } from '../utils/dateUtils';
+
+// =====================================================================================
+// REAL BACKEND API INTEGRATION
+//
+// This application now uses real backend API calls for all data operations.
+// All mock data and fallbacks have been removed.
+// =====================================================================================
+
+const API_BASE_URL = 'http://localhost:3002'; // Backend API URL
+
+// --- User Management Interfaces (kept for consistency with AuthContext) ---
+export interface ParsedLoginCredentials {
+     username: string;
+     password?: string;
+}
+
+export interface ParsedRegisterData {
+     username: string;
+     email: string;
+     password?: string;
+     role: UserRole;
+     firstName: string;
+     lastName: string;
+     profilePictureUrl?: string | null;
+}
+
+// --- Helper to get the auth token ---
+const getAuthToken = (): string | null => localStorage.getItem('authToken');
+
+
+// --- Helper to convert StoredUser to User ---
+const stripPassword = (storedUser: StoredUser): User => {
+  const { password_hash, ...user } = storedUser;
+  return user;
+};
+
+// --- User API Functions ---
+export const apiLogin = async (credentials: ParsedLoginCredentials): Promise<{ user: User, token: string }> => {
+  const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(credentials),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Login failed');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiRegister = async (userData: ParsedRegisterData): Promise<User> => {
+  const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(userData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Registration failed');
+  }
+
+  const data = await response.json();
+  return data.user;
+};
+
+export const apiLogout = async (): Promise<void> => {
+  // Logout is typically handled client-side by clearing tokens
+  return Promise.resolve();
+};
+
+export const apiFetchAllUsers = async (): Promise<User[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/users`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch users');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiFetchUserById = async (userId: string): Promise<User | undefined> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return undefined;
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch user');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiUpdateUserProfile = async (userId: string, updates: EmployeeProfileUpdateData): Promise<User> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to update user profile');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiUploadProfilePicture = async (userId: string, file: File): Promise<{ profilePictureUrl: string }> => {
+  const formData = new FormData();
+  formData.append('profilePicture', file);
+
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/profile-picture`, {
+    method: 'POST',
+    headers: {
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to upload profile picture');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiAdminUpdateUser = async (userId: string, updates: AdminUserUpdateData): Promise<User> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/admin`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to update user');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiDeleteUser = async (userIdToDelete: string, currentAdminUserId: string): Promise<void> => {
+  if (userIdToDelete === currentAdminUserId) {
+    throw new Error("Admins cannot delete their own accounts.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/users/${userIdToDelete}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to delete user');
+  }
+};
+
+export const apiChangePassword = async (userId: string, data: ChangePasswordData): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/password`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to change password');
+  }
+};
+
+export const apiAdminResetPassword = async (userId: string, newPassword: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/users/${userId}/reset-password`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ newPassword }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to reset password');
+  }
+};
+
+
+// --- Dashboard API Functions ---
+export const fetchAdminDashboardData = async (): Promise<AdminDashboardData> => {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/admin`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch dashboard data');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiCheckObjectIds = async (projectId: string, objectIds: string[]): Promise<{ duplicates: string[] }> => {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/check-duplicates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ objectIds }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to check duplicates');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const fetchEmployeeDashboardData = async (userId: string): Promise<EmployeeDashboardData> => {
+  const response = await fetch(`${API_BASE_URL}/api/dashboard/employee/${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch employee dashboard data');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+// --- Project API Functions ---
+export const apiFetchProjects = async (): Promise<Project[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch projects');
+  }
+
+  const projects = await response.json();
+  return projects;
+};
+
+export const apiFetchProjectById = async (projectId: string): Promise<Project | undefined> => {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return undefined;
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch project');
+  }
+
+  const project = await response.json();
+  return project;
+};
+
+export const apiAddProject = async (projectData: Omit<Project, 'id'>): Promise<Project> => {
+  const response = await fetch(`${API_BASE_URL}/api/projects`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(projectData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to create project');
+  }
+
+  const newProject = await response.json();
+  return newProject;
+};
+
+export const apiUpdateProject = async (projectId: string, updates: Partial<Omit<Project, 'id'>>): Promise<Project> => {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to update project');
+  }
+
+  const updatedProject = await response.json();
+  return updatedProject;
+};
+
+export const apiDeleteProject = async (projectId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to delete project');
+  }
+};
+
+// --- Billing API Functions ---
+interface BillingFilters {
+  userId?: string;
+  status?: BillingStatus;
+  projectId?: string;
+  actingUserRole?: UserRole;
+}
+
+export const apiFetchBillingRecords = async (filters?: BillingFilters): Promise<BillingRecord[]> => {
+  const queryParams = new URLSearchParams();
+  if (filters?.userId) queryParams.append('userId', filters.userId);
+  if (filters?.status) queryParams.append('status', filters.status);
+  if (filters?.projectId) queryParams.append('projectId', filters.projectId);
+
+  const response = await fetch(`${API_BASE_URL}/api/billing-records?${queryParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch billing records');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiAddBillingRecord = async (recordData: Partial<BillingRecord>): Promise<BillingRecord> => {
+  const response = await fetch(`${API_BASE_URL}/api/billing-records`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(recordData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to create billing record');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiUpdateBillingRecord = async (recordId: string, updates: Partial<BillingRecord>): Promise<BillingRecord> => {
+  const response = await fetch(`${API_BASE_URL}/api/billing-records/${recordId}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to update billing record');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiDeleteBillingRecord = async (recordId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/billing-records/${recordId}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to delete billing record');
+  }
+};
+
+// --- Daily Work Report API Functions ---
+export const apiSubmitDailyWorkReport = async (reportData: NewDailyWorkReportData): Promise<DailyWorkReport> => {
+  const response = await fetch(`${API_BASE_URL}/api/work-reports/submit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(reportData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to submit work report');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+
+export const apiFetchUserDailyWorkReports = async (userId: string, filters?: {startDate?: string, endDate?: string}): Promise<DailyWorkReport[]> => {
+  const queryParams = new URLSearchParams();
+  if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+  if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+
+  const response = await fetch(`${API_BASE_URL}/api/work-reports?${queryParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch work reports');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+export const apiFetchAllDailyWorkReports = async (filters?: WorkReportFilters): Promise<DailyWorkReport[]> => {
+  const queryParams = new URLSearchParams();
+  if (filters?.userId) queryParams.append('userId', filters.userId);
+  if (filters?.projectId) queryParams.append('projectId', filters.projectId);
+  if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+  if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+
+  const response = await fetch(`${API_BASE_URL}/api/work-reports/all?${queryParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch work reports');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+export const apiGetDailyWorkReport = async (userId: string, date: string): Promise<DailyWorkReport | undefined> => {
+  const response = await fetch(`${API_BASE_URL}/api/work-reports/${userId}/${date}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return undefined;
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Failed to fetch work report');
+  }
+
+  const data = await response.json();
+  return data.data;
+};
+
+// --- Leave Management API Functions ---
+export const apiApplyForLeave = async (requestData: NewLeaveRequestData): Promise<LeaveRequest> => {
+  const response = await fetch(`${API_BASE_URL}/api/leave-requests`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(requestData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to apply for leave');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiFetchUserLeaveRequests = async (userId: string): Promise<LeaveRequest[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/leave-requests?userId=${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch leave requests');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiFetchAllLeaveRequests = async (filters?: { status?: LeaveStatus, userId?: string, startDate?: string, endDate?: string }): Promise<LeaveRequest[]> => {
+  const queryParams = new URLSearchParams();
+  if (filters?.status) queryParams.append('status', filters.status);
+  if (filters?.userId) queryParams.append('userId', filters.userId);
+  if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+  if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+
+  const response = await fetch(`${API_BASE_URL}/api/leave-requests?${queryParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch leave requests');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiUpdateLeaveRequestStatus = async (requestId: string, status: LeaveStatus.APPROVED | LeaveStatus.REJECTED, adminNotes?: string): Promise<LeaveRequest> => {
+  const response = await fetch(`${API_BASE_URL}/api/leave-requests/${requestId}/status`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ status, adminNotes }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to update leave request status');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiCancelLeaveRequest = async (requestId: string, userId: string): Promise<LeaveRequest> => {
+  const response = await fetch(`${API_BASE_URL}/api/leave-requests/${requestId}/cancel`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to cancel leave request');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+// --- Attendance API Functions ---
+export const apiClockIn = async (userId: string): Promise<AttendanceRecord> => {
+  const response = await fetch(`${API_BASE_URL}/api/attendance/clock-in`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to clock in');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiClockOut = async (userId: string): Promise<AttendanceRecord> => {
+  const response = await fetch(`${API_BASE_URL}/api/attendance/clock-out`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to clock out');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiGetUserTodayAttendanceStatus = async (userId: string): Promise<UserAttendanceStatus> => {
+  const response = await fetch(`${API_BASE_URL}/api/attendance/status/${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to get attendance status');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiFetchAllAttendanceRecords = async (filters?: { userId?: string, date?: string, startDate?: string, endDate?: string }): Promise<AttendanceRecord[]> => {
+  const queryParams = new URLSearchParams();
+  if (filters?.userId) queryParams.append('userId', filters.userId);
+  if (filters?.date) queryParams.append('date', filters.date);
+  if (filters?.startDate) queryParams.append('startDate', filters.startDate);
+  if (filters?.endDate) queryParams.append('endDate', filters.endDate);
+
+  const response = await fetch(`${API_BASE_URL}/api/attendance?${queryParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch attendance records');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+// --- Internal Messaging API Functions ---
+export const apiSendInternalMessage = async (messageData: Omit<InternalMessage, 'id' | 'timestamp' | 'isRead' | 'senderName' | 'senderProfilePictureUrl'>): Promise<InternalMessage> => {
+  const response = await fetch(`${API_BASE_URL}/api/messages`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(messageData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to send message');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiFetchUserMessages = async (userId: string): Promise<InternalMessage[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/messages?userId=${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to fetch messages');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiMarkMessageAsRead = async (messageId: string, userId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/messages/${messageId}/read`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to mark message as read');
+  }
+};
+
+export const apiMarkAllMessagesAsReadForUser = async (userId: string): Promise<void> => {
+  const response = await fetch(`${API_BASE_URL}/api/messages/mark-all-read`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ userId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to mark all messages as read');
+  }
+};
+
+export const apiGetUnreadMessageCount = async (userId: string): Promise<number> => {
+  const response = await fetch(`${API_BASE_URL}/api/messages/unread-count?userId=${userId}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to get unread message count');
+  }
+
+  const data = await response.json();
+  return data.count;
+};
+
+// --- Report API Functions ---
+export const apiSubmitReport = async (reportData: any): Promise<{ billingAmount: number }> => {
+  const response = await fetch(`${API_BASE_URL}/api/reports/submit`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify(reportData),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to submit report');
+  }
+
+  const data = await response.json();
+  return data;
+};
+
+export const apiCheckDuplicateObjectIds = async (projectId: string, objectIds: string[]): Promise<any[]> => {
+  const response = await fetch(`${API_BASE_URL}/api/reports/check-duplicates`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ projectId, objectIds }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to check duplicates');
+  }
+
+  const data = await response.json();
+  return data.duplicates;
+};
+
+export const apiExtractFields = async (rawData: any): Promise<{ extractedData: { reportData: any; items: any[] }; rawData: any[] }> => {
+  const response = await fetch(`${API_BASE_URL}/api/reports/extract-fields`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(getAuthToken() && { Authorization: `Bearer ${getAuthToken()}` }),
+    },
+    body: JSON.stringify({ rawData }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || 'Failed to extract fields');
+  }
+
+  const data = await response.json();
+  return data;
+};

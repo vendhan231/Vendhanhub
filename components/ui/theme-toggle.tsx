@@ -1,26 +1,42 @@
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
+import { Button } from "./button"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { getTheme, setTheme } from "@/lib/utils"
+} from "./dropdown-menu"
+
+// Lightweight theme helpers scoped to this component
+const getThemeLocal = () => {
+  try {
+    return (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
+  } catch {
+    return 'light'
+  }
+}
+
+const setThemeLocal = (t: 'light' | 'dark') => {
+  try {
+    localStorage.setItem('theme', t)
+    document.documentElement.classList.toggle('dark', t === 'dark')
+  } catch {}
+}
 
 export function ThemeToggle() {
-  const [theme, setThemeState] = React.useState<'light' | 'dark'>(getTheme() as 'light' | 'dark')
+  const [_theme, setThemeState] = React.useState<'light' | 'dark'>(getThemeLocal())
 
   React.useEffect(() => {
-    const currentTheme = getTheme() as 'light' | 'dark'
-    setTheme(currentTheme)
+    const currentTheme = getThemeLocal()
+    setThemeState(currentTheme)
+    setThemeLocal(currentTheme)
   }, [])
 
   const handleThemeChange = (newTheme: 'light' | 'dark') => {
     setThemeState(newTheme)
-    setTheme(newTheme)
+    setThemeLocal(newTheme)
   }
 
   return (

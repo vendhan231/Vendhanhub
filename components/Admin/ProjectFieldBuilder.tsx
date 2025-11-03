@@ -9,7 +9,7 @@ import { Plus, Trash2, GripVertical } from "lucide-react";
 export interface ProjectField {
   id: string;
   label: string;
-  type: "text" | "number";
+  type: "text" | "number" | "date" | "textarea";
   required: boolean;
   order: number;
 }
@@ -71,7 +71,7 @@ export const ProjectFieldBuilder = ({ fields, onChange }: ProjectFieldBuilderPro
                     <Label className="text-xs">Field Type</Label>
                     <Select
                       value={field.type}
-                      onValueChange={(value: "text" | "number") =>
+                      onValueChange={(value: "text" | "number" | "date" | "textarea") =>
                         updateField(field.id, { type: value })
                       }
                     >
@@ -81,6 +81,8 @@ export const ProjectFieldBuilder = ({ fields, onChange }: ProjectFieldBuilderPro
                       <SelectContent>
                         <SelectItem value="text">Text</SelectItem>
                         <SelectItem value="number">Number</SelectItem>
+                        <SelectItem value="date">Date</SelectItem>
+                        <SelectItem value="textarea">Text Area</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

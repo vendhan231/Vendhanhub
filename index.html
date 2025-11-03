@@ -5,69 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Employee Management System</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            'theme-primary': '#2D5016',
-            'theme-secondary': '#4A7C59',
-            'theme-accent': '#E8F5E8',
-            'theme-primary-text': '#FFFFFF',
-            'theme-secondary-text': '#FFFFFF',
-            'theme-accent-text': '#2D5016',
-            background: 'hsl(var(--background))',
-            foreground: 'hsl(var(--foreground))',
-            card: {
-              DEFAULT: 'hsl(var(--card))',
-              foreground: 'hsl(var(--card-foreground))'
-            },
-            popover: {
-              DEFAULT: 'hsl(var(--popover))',
-              foreground: 'hsl(var(--popover-foreground))'
-            },
-            primary: {
-              DEFAULT: 'hsl(var(--primary))',
-              foreground: 'hsl(var(--primary-foreground))'
-            },
-            secondary: {
-              DEFAULT: 'hsl(var(--secondary))',
-              foreground: 'hsl(var(--secondary-foreground))'
-            },
-            muted: {
-              DEFAULT: 'hsl(var(--muted))',
-              foreground: 'hsl(var(--muted-foreground))'
-            },
-            accent: {
-              DEFAULT: 'hsl(var(--accent))',
-              foreground: 'hsl(var(--accent-foreground))'
-            },
-            destructive: {
-              DEFAULT: 'hsl(var(--destructive))',
-              foreground: 'hsl(var(--destructive-foreground))'
-            },
-            border: 'hsl(var(--border))',
-            input: 'hsl(var(--input))',
-            ring: 'hsl(var(--ring))',
-            chart: {
-              '1': 'hsl(var(--chart-1))',
-              '2': 'hsl(var(--chart-2))',
-              '3': 'hsl(var(--chart-3))',
-              '4': 'hsl(var(--chart-4))',
-              '5': 'hsl(var(--chart-5))'
-            }
-          },
-          borderRadius: {
-            lg: 'var(--radius)',
-            md: 'calc(var(--radius) - 2px)',
-            sm: 'calc(var(--radius) - 4px)'
-          }
-        }
-      }
-    }
-  </script>
+  <!-- tailwind CDN removed so PostCSS + @tailwindcss/postcss handles Tailwind locally -->
 <script type="importmap">
 {
   "imports": {
@@ -81,7 +19,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-<body class="bg-theme-accent">
+<body class="bg-background text-foreground antialiased">
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

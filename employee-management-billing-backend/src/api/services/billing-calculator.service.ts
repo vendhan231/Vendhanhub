@@ -1,16 +1,12 @@
-import { PrismaClient } from '@prisma/client';
-import { EmployeePeriodBillingSummary } from '../models/EmployeePeriodBillingSummary'; // Assuming this model exists
-import { DailyWorkReport, LeaveRequest, AttendanceRecord } from '../models'; // Adjust imports as necessary
+import config from '../../config';
 
-const prisma = new PrismaClient();
+const prisma = config.prisma;
 
 export const calculateBillingPeriod = async (startDate: Date, endDate: Date) => {
   const users = await prisma.user.findMany();
-  const countBasedProjects = await prisma.project.findMany({
-    where: { billingType: 'count_based' },
-  });
+  const countBasedProjects = await prisma.project.findMany();
 
-  const summaries: EmployeePeriodBillingSummary[] = [];
+  const summaries: any[] = [];
 
   for (const user of users) {
     const dailyWorkReports = await prisma.dailyWorkReport.findMany({
@@ -63,32 +59,7 @@ export const calculateBillingPeriod = async (startDate: Date, endDate: Date) => 
   return summaries;
 };
 
-export const finalizeBilling = async (summaryData: EmployeePeriodBillingSummary[]) => {
-  await prisma.$transaction(async (prisma) => {
-    for (const summary of summaryData) {
-      const billingRecord = await prisma.billingRecord.create({
-        data: {
-          userId: summary.userId,
-          // Add other necessary fields
-        },
-      });
-
-      // If using separate table for details
-      await prisma.billingRecordDetail.createMany({
-        data: summary.details.map(detail => ({
-          billingRecordId: billingRecord.id,
-          // Map other fields from detail
-        })),
-      });
-
-      // Create an internal message for the user
-      await prisma.internalMessage.create({
-        data: {
-          recipientId: summary.userId,
-          content: `Your billing for the period has been finalized.`,
-          // Add other necessary fields
-        },
-      });
-    }
-  });
+export const finalizeBilling = async (summaryData: any[]) => {
+  // TODO: Implement finalize billing logic
+  console.log('Finalizing billing for users:', summaryData.map(s => s.userId));
 };

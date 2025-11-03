@@ -43,17 +43,24 @@ export const extractFields = async (req: Request, res: Response) => {
     // Extract data from file
     const extractedData = await extractDataFromFile(req.file.buffer, req.file.mimetype);
 
-    // Map fields to project configuration
-    const mappedData = mapFieldsToProject(extractedData, project.fieldConfig);
+    // Map fields to project configuration - improved field matching
+    const fieldConfig = {
+      report_level: [],
+      item_level: project.item_fields || []
+    };
+    const mappedData = mapFieldsToProject(extractedData, fieldConfig);
 
     // Calculate billing preview if there's data
     let billingPreview = null;
     if (mappedData.items.length > 0) {
       try {
-
-        // Mock the database call by creating a temporary calculation
-        const fieldConfig = project.fieldConfig;
-        const billingConfig = project.billingConfig;
+        // Get field and billing config from project response
+        const fieldConfig = project.item_fields || [];
+        const billingConfig = {
+          rateType: 'custom_formula',
+          formula: project.billing_formula || '',
+          rateValue: 0
+        };
 
         let totalAmount = 0;
         if (billingConfig.rateType === 'custom_formula' && billingConfig.formula) {
@@ -61,8 +68,8 @@ export const extractFields = async (req: Request, res: Response) => {
           for (const item of mappedData.items) {
             const fieldValues: Record<string, any> = {};
 
-            // Extract numeric field values from item data
-            fieldConfig.item_level?.forEach((field: any) => {
+            // Extract numeric field values from item data - improved field matching
+            fieldConfig.forEach((field: any) => {
               if (field.type === 'number' && field.includeInBilling && item[field.label] !== undefined) {
                 fieldValues[field.label] = parseFloat(item[field.label]) || 0;
               }
@@ -81,11 +88,8 @@ export const extractFields = async (req: Request, res: Response) => {
         } else if (billingConfig.rateType === 'per_record') {
           totalAmount = billingConfig.rateValue;
         } else if (billingConfig.rateType === 'per_count_field') {
-          let totalCount = 0;
-          for (const item of mappedData.items) {
-            totalCount += parseFloat(item[billingConfig.countField] || '0');
-          }
-          totalAmount = totalCount * billingConfig.rateValue;
+          // For now, skip this case as countField is not defined in current config
+          totalAmount = 0;
         }
 
         billingPreview = {

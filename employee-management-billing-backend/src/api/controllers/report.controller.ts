@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express-serve-static-core';
 import * as reportService from '../services/report.service';
 import * as reportValidators from '../validators/report.validators';
 import { ZodError } from 'zod';
@@ -22,7 +22,7 @@ export const createReport = async (req: Request, res: Response) => {
       message: 'Report submitted successfully',
       report: result.report,
       billing: result.billing,
-      billingAmount: result.billing.billingAmount,
+      billingAmount: result.billing.calculatedAmount,
     });
   } catch (error: any) {
     if (error instanceof ZodError) {

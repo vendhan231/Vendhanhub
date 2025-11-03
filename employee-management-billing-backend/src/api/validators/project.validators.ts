@@ -1,12 +1,14 @@
 import { z } from 'zod';
 
 const fieldSchema = z.object({
+  id: z.string().optional(),
   label: z.string(),
   type: z.enum(['text', 'number', 'date', 'select', 'textarea']),
   options: z.array(z.string()).optional(),
   unique: z.boolean().optional(),
   required: z.boolean().optional(),
   includeInBilling: z.boolean().optional(),
+  order: z.number().optional(),
 });
 
 const billingConfigSchema = z.object({
@@ -18,22 +20,34 @@ const billingConfigSchema = z.object({
 
 export const createProjectSchema = z.object({
   name: z.string().min(1, 'Project name is required').max(255, 'Project name must be less than 255 characters'),
-  fieldConfig: z.object({
-    report_level: z.array(fieldSchema),
-    item_level: z.array(fieldSchema),
-  }),
-  billingConfig: billingConfigSchema,
+  description: z.string().optional(),
+  billing_formula: z.string().min(1, 'Billing formula is required'),
+  item_fields: z.array(fieldSchema),
+  edit_window_hours: z.number().min(1).max(8760).optional(),
+  is_template: z.boolean().optional(),
+  template_category: z.string().optional(),
+  is_active: z.boolean().optional(),
 });
 
 export const updateProjectSchema = z.object({
   name: z.string().min(1, 'Project name is required').max(255, 'Project name must be less than 255 characters').optional(),
-  fieldConfig: z.object({
-    report_level: z.array(fieldSchema),
-    item_level: z.array(fieldSchema),
-  }).optional(),
-  billingConfig: billingConfigSchema.optional(),
+  description: z.string().optional(),
+  billing_formula: z.string().min(1, 'Billing formula is required').optional(),
+  item_fields: z.array(fieldSchema).optional(),
+  edit_window_hours: z.number().min(1).max(8760).optional(),
+  is_template: z.boolean().optional(),
+  template_category: z.string().optional(),
+  is_active: z.boolean().optional(),
 });
 
 export const projectIdSchema = z.object({
   projectId: z.string().uuid('Invalid project ID format'),
 });
+
+export const createProjectValidator = (data: any) => {
+  return createProjectSchema.parse(data);
+};
+
+export const updateProjectValidator = (data: any) => {
+  return updateProjectSchema.parse(data);
+};

@@ -9,7 +9,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - VITE_API_BASE_URL=http://backend:3001/api/v1
+      - VITE_API_BASE_URL=http://backend:3002/api/v1
     depends_on:
       - backend
     networks:
@@ -21,33 +21,18 @@ services:
       context: ./employee-management-billing-backend
       dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "3002:3002"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:password@db:5432/employee_db
+      - DATABASE_URL=file:./dev.db
       - JWT_SECRET=your-production-jwt-secret-key-here
       - GEMINI_API_KEY=your-production-gemini-api-key
-      - PORT=3001
+      - PORT=3002
       - HOST=0.0.0.0
-    depends_on:
-      - db
+      - FRONTEND_URL=http://frontend:3000
     volumes:
+      - backend_data:/app
       - uploads:/app/uploads
-    networks:
-      - app-network
-    restart: unless-stopped
-
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=employee_db
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./employee-management-billing-backend/prisma:/docker-entrypoint-initdb.d
     networks:
       - app-network
     restart: unless-stopped
@@ -68,7 +53,7 @@ services:
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  backend_data:
   uploads:
 
 networks:

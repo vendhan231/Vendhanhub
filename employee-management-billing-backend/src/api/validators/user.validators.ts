@@ -32,3 +32,6 @@ export const changePasswordSchema = z.object({
   message: "New passwords must match",
   path: ["newPasswordB"],
 });
+
+export const UserCreateInput = createUserSchema;
+export const UserUpdateInput = updateUserSchema;

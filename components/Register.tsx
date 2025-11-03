@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { UserRole } from '../types';
 import { APP_NAME, THEME } from '../constants';
 import BackButton from './Common/BackButton'; 
@@ -17,7 +17,7 @@ const Register: React.FC = () => {
 
   // Renamed 'error' from useAuth to 'authError' to avoid conflict with local 'error' state if needed.
   // Using 'formError' for local form validation messages if any.
-  const { register, isLoading, error: authErrorHook, clearError, user: loggedInUser } = useAuth();
+  const { register, isLoading, error: authErrorHook, clearError } = useAuth();
   const navigate = useNavigate();
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -51,7 +51,7 @@ const Register: React.FC = () => {
         await register({ username, email, password, role: role, firstName, lastName });
         // If register succeeds (doesn't throw), then show success and navigate
         alert('User registered successfully.'); 
-        navigate('/app/admin/employees'); 
+        navigate('/app/admin/users');
     } catch (err: any) {
         // If register throws an error (e.g., from apiRegister via AuthContext),
         // it will be caught here. The error from AuthContext (authErrorHook)
@@ -133,7 +133,7 @@ const Register: React.FC = () => {
           <div>
             <button
               type="button"
-              onClick={() => navigate('/app/admin/employees')} 
+              onClick={() => navigate('/app/admin/users')}
               className={buttonSecondaryClasses}
               aria-label="Cancel registration and return to manage employees"
             >

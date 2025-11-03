@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { apiFetchBillingRecords, apiFetchProjects, apiFetchAllUsers } from '../../services/api';
 import { BillingRecord, Project, User, BillingAnalytics, ProjectBillingSummary, UserBillingSummary, BillingStatus } from '../../types';
 import { THEME } from '../../constants';
-import { ChartBarIcon, DocumentTextIcon, CurrencyDollarIcon, UserGroupIcon, FolderIcon } from '@heroicons/react/24/outline';
+import { DocumentTextIcon, CurrencyDollarIcon, UserGroupIcon, FolderIcon } from '@heroicons/react/24/outline';
 
 const ViewAnalytics: React.FC = () => {
   const [analytics, setAnalytics] = useState<BillingAnalytics | null>(null);
@@ -29,7 +29,7 @@ const ViewAnalytics: React.FC = () => {
 
       // Calculate analytics
       const analyticsData = calculateAnalytics(billingRecords);
-      const projectData = calculateProjectSummaries(billingRecords, projects);
+      const projectData = calculateProjectSummaries(billingRecords);
       const userData = calculateUserSummaries(billingRecords, users);
 
       setAnalytics(analyticsData);
@@ -43,14 +43,14 @@ const ViewAnalytics: React.FC = () => {
   };
 
   const calculateAnalytics = (records: BillingRecord[]): BillingAnalytics => {
-    const totalBilling = records.reduce((sum, record) => sum + record.billingAmount, 0);
+    const totalBilling = records.reduce((sum, record) => sum + record.calculatedAmount, 0);
     const pendingBilling = records
       .filter(r => r.status === BillingStatus.PENDING)
-      .reduce((sum, record) => sum + record.billingAmount, 0);
+      .reduce((sum, record) => sum + record.calculatedAmount, 0);
     const approvedBilling = 0; // Placeholder - no APPROVED status in current enum
     const paidBilling = records
       .filter(r => r.status === BillingStatus.PAID)
-      .reduce((sum, record) => sum + record.billingAmount, 0);
+      .reduce((sum, record) => sum + record.calculatedAmount, 0);
 
     const uniqueProjects = new Set(records.map(r => r.projectId)).size;
     const uniqueUsers = new Set(records.map(r => r.userId)).size;
@@ -72,7 +72,7 @@ const ViewAnalytics: React.FC = () => {
     };
   };
 
-  const calculateProjectSummaries = (records: BillingRecord[], projects: Project[]): ProjectBillingSummary[] => {
+  const calculateProjectSummaries = (records: BillingRecord[]): ProjectBillingSummary[] => {
     const projectMap = new Map<string, ProjectBillingSummary>();
 
     records.forEach(record => {
@@ -84,8 +84,8 @@ const ViewAnalytics: React.FC = () => {
         reportCount: 0
       };
 
-      existing.totalBilling += record.billingAmount;
-      existing.totalItems += record.totalItems;
+      existing.totalBilling += record.calculatedAmount;
+      existing.totalItems += record.achievedCountTotal || 0;
       existing.reportCount += 1;
 
       projectMap.set(record.projectId, existing);
@@ -105,7 +105,7 @@ const ViewAnalytics: React.FC = () => {
         reportCount: 0
       };
 
-      existing.totalBilling += record.billingAmount;
+      existing.totalBilling += record.calculatedAmount;
       existing.reportCount += 1;
 
       userMap.set(record.userId, existing);

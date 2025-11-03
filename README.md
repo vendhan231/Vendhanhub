@@ -7,10 +7,20 @@ A comprehensive full-stack application for managing employees, tracking work rep
 ### Core Functionality
 - **User Management**: Admin and employee roles with secure authentication
 - **Work Report Tracking**: Daily work reports with project logging and time tracking
+- **Dynamic Project Management**: Create projects with custom fields and intelligent billing formulas
 - **Billing System**: Automated billing calculations with multiple pricing models
 - **Leave Management**: Leave request system with approval workflow
 - **Real-time Updates**: Socket.IO integration for live notifications
 - **Dark Mode**: Complete theme switching support
+
+### Recent Updates & Fixes
+- **✅ Fixed Project Loading**: Projects now properly load from backend API in both admin dashboard and employee work report forms
+- **✅ Fixed User Management Navigation**: View icons in user management now correctly navigate to user detail pages
+- **✅ Enhanced Type Safety**: Updated Project interface to support dynamic fields and billing formulas
+- **✅ Improved API Integration**: Better error handling and fallback to mock data when backend is unavailable
+- **✅ Dynamic Field Support**: Projects can now have custom fields with different types (text, number, date, textarea)
+- **✅ Intelligent Billing**: Custom billing formulas that automatically calculate based on project fields
+- **✅ Template System**: Project templates for quick setup with pre-configured fields
 
 ### Technical Features
 - **Profile Pictures**: Mandatory user avatars with upload functionality
@@ -48,6 +58,8 @@ A comprehensive full-stack application for managing employees, tracking work rep
 - Docker (optional, for containerized deployment)
 
 ### Development Setup
+
+**Note on PostgreSQL Setup:** The `scripts/setup-postgresql.bat` script now dynamically loads database credentials from the `employee-management-billing-backend/.env` file. Ensure your `.env` file is correctly configured before running the setup script.
 
 1. **Clone the repository**
    ```bash
@@ -234,6 +246,19 @@ For support and questions:
 - Check the documentation in the `/docs` folder
 - Review the API documentation above
 
+## Known Issues & In Progress
+
+### Currently Being Addressed
+- **🔧 Object ID Duplicate Detection**: Working on improving the duplicate Object ID detection functionality in work reports
+- **🔧 Field Value Extraction**: Enhancing the extraction of corresponding field values from project sheets
+- **🔧 File Processing**: Improving CSV/Excel file processing and field mapping
+
+### Recently Resolved
+- **✅ Project Loading Issues**: Fixed projects not displaying in admin dashboard and employee work report forms
+- **✅ User Management Navigation**: Fixed view icons redirecting to welcome page instead of user detail view
+- **✅ Type Safety Improvements**: Resolved TypeScript errors related to project interfaces
+- **✅ API Integration**: Enhanced backend API connectivity with proper error handling
+
 ## Roadmap
 
 - [ ] Advanced analytics dashboard
@@ -242,3 +267,5 @@ For support and questions:
 - [ ] Advanced reporting features
 - [ ] Integration with external HR systems
 - [ ] AI-powered work report analysis
+- [ ] Enhanced duplicate detection system
+- [ ] Improved file processing and field mapping

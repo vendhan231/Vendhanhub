@@ -62,6 +62,36 @@ To use a server-based database (PostgreSQL, MySQL, SQL Server), follow these ste
 
 The server will log which database type is being used on startup.
 
+### Troubleshooting: P1000 Authentication Failed
+
+If you see an error like:
+
+```
+P1000: Authentication failed against database server at `localhost`, the provided database credentials for `postgres` are not valid.
+```
+
+Check the following:
+
+- Ensure your Postgres server is running and reachable on the host/port in `.env`.
+- Verify the database user and password are correct. If your password contains special characters (e.g. `@`, `:`, `%`), you must URL-encode them when used directly in `DATABASE_URL`. For example:
+
+```
+password: vendhan@123  -> URL-encoded: vendhan%40123
+```
+
+- Prefer using `SERVER_DB_URL` or constructing the `DATABASE_URL` from individual env vars in your deployment so you avoid manual encoding errors.
+
+Example Windows PowerShell commands to check connectivity:
+
+```powershell
+# Try connecting with psql (if installed)
+psql "postgresql://postgres:vendhan%40123@localhost:5432/EMS"
+
+# Or check port is listening
+Test-NetConnection -ComputerName localhost -Port 5432
+```
+
+
 ## LAN Access
 
 The server is configured to bind to all network interfaces, making it accessible from other devices on the LAN.

@@ -3,8 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 // ENUMS
@@ -50,7 +50,7 @@ model User {
   profilePictureUrl       String?
   phone                   String?
   department              String?
-  joinDate                DateTime? @db.Date
+  joinDate                DateTime?
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
@@ -81,7 +81,7 @@ model Project {
 model DailyWorkReport {
   id                String    @id @default(uuid())
   userId            String
-  date              DateTime  @db.Date
+  date              DateTime
   submittedAt       DateTime
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
@@ -98,7 +98,7 @@ model ProjectLogItem {
   projectId           String
   projectName         String
   hoursWorked         Decimal
-  description         String    @db.Text
+  description         String
   achievedCount       Int?
 
   dailyWorkReport     DailyWorkReport @relation(fields: [dailyWorkReportId], references: [id], onDelete: Cascade)
@@ -111,12 +111,12 @@ model LeaveRequest {
   userFirstName       String
   userLastName        String
   leaveType           LeaveType
-  startDate           DateTime      @db.Date
-  endDate             DateTime      @db.Date
-  reason              String        @db.Text
+  startDate           DateTime
+  endDate             DateTime
+  reason              String
   status              RequestStatus @default(PENDING)
   requestedAt         DateTime
-  adminNotes          String?       @db.Text
+  adminNotes          String?
   resolvedAt          DateTime?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
@@ -127,11 +127,11 @@ model LeaveRequest {
 model AttendanceRecord {
   id            String    @id @default(uuid())
   userId        String
-  date          DateTime  @db.Date
+  date          DateTime
   clockInTime   DateTime
   clockOutTime  DateTime?
   totalHours    Decimal?
-  notes         String?   @db.Text
+  notes         String?
 
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -147,22 +147,23 @@ model BillingRecord {
   hoursBilled              Decimal?
   rateApplied              Decimal?
   calculatedAmount         Decimal
-  date                     DateTime      @db.Date
+  date                     DateTime
   status                   BillingStatus @default(PENDING)
-  notes                    String?       @db.Text
+  notes                    String?
   isCountBased             Boolean
   achievedCountTotal       Int?
   countMetricLabelUsed     String?
   formulaUsed              String?
-  billingPeriodStartDate   DateTime?     @db.Date
-  billingPeriodEndDate     DateTime?     @db.Date
+  billingPeriodStartDate   DateTime?
+  billingPeriodEndDate     DateTime?
   createdAt                DateTime      @default(now())
   updatedAt                DateTime      @updatedAt
 
   details                  Json?
 
-  user                     User    @relation(fields: [userId], references: [id], onDelete: Restrict)
-  project                  Project @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  user                     User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  project                  Project               @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  billingRecordDetails     BillingRecordDetail[]
 }
 
 model BillingRecordDetail {
@@ -187,7 +188,7 @@ model InternalMessage {
   senderName                  String
   senderProfilePictureUrl     String?
   recipientId                 String
-  content                     String    @db.Text
+  content                     String
   timestamp                   DateTime
   isRead                      Boolean   @default(false)
   relatedEntityId             String?

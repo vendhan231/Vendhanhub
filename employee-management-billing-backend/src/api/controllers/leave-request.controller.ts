@@ -1,39 +1,42 @@
 import { Request, Response } from 'express';
 import { LeaveRequest } from '@prisma/client';
 import { leaveRequestService } from '../services/leave-request.service';
-import { z } from 'zod';
-import { validationMiddleware } from '../middleware/validation.middleware';
-
-const leaveRequestSchema = z.object({
-  leaveType: z.enum(['ANNUAL', 'SICK', 'UNPAID', 'OTHER']),
-  startDate: z.date(),
-  endDate: z.date(),
-  reason: z.string().min(1),
-});
+import { validateLeaveRequest, validateCancelLeaveRequest } from '../validators/leave-request.validators';
 
 export const createLeaveRequest = async (req: Request, res: Response) => {
   try {
-    const validatedData = leaveRequestSchema.parse(req.body);
-    const userId = req.user.id; // Assuming user ID is attached to req.user by auth middleware
-    const leaveRequest: LeaveRequest = await leaveRequestService.createLeaveRequest({
+    const validatedData = validateLeaveRequest(req.body);
+    const user = (req as any).user;
+
+    if (!user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const leaveRequest = await leaveRequestService.createLeaveRequest({
       ...validatedData,
-      userId,
-      userFirstName: req.user.firstName,
-      userLastName: req.user.lastName,
+      userId: user.id,
+      userFirstName: user.firstName || user.username,
+      userLastName: user.lastName || '',
       requestedAt: new Date(),
-    });
+    } as any);
     res.status(201).json(leaveRequest);
   } catch (error) {
-    res.status(400).json({ error: error.message });
+    res.status(400).json({ error: (error as Error).message });
   }
 };
 
 export const cancelLeaveRequest = async (req: Request, res: Response) => {
   const { requestId } = req.params;
+  const user = (req as any).user;
+
+  if (!user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
   try {
-    const leaveRequest = await leaveRequestService.cancelLeaveRequest(requestId, req.user.id);
+    const leaveRequest = await leaveRequestService.cancelLeaveRequest(requestId, user.id);
     res.status(200).json(leaveRequest);
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    res.status(404).json({ error: (error as Error).message });
   }
 };

@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import config from '../../config';
 
-const prisma = new PrismaClient();
+const prisma = config.prisma;
 
 // Helper function to evaluate custom billing formula
 const evaluateFormula = (formula: string, fieldValues: Record<string, any>): number => {
@@ -29,11 +29,6 @@ export const getBillingRecords = async (userId?: string) => {
     include: {
       user: true,
       project: true,
-      report: {
-        include: {
-          items: true,
-        },
-      },
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -86,29 +81,34 @@ export const getBillingAnalytics = async () => {
     paidBilling,
     monthlyBilling,
   ] = await Promise.all([
-    prisma.billingRecord.aggregate({
-      _sum: { billingAmount: true },
-    }),
-    prisma.billingRecord.aggregate({
-      _sum: { billingAmount: true },
-      where: { status: 'PENDING' },
-    }),
-    prisma.billingRecord.aggregate({
-      _sum: { billingAmount: true },
-      where: { status: 'APPROVED' },
-    }),
-    prisma.billingRecord.aggregate({
-      _sum: { billingAmount: true },
-      where: { status: 'PAID' },
-    }),
-    prisma.billingRecord.aggregate({
-      _sum: { billingAmount: true },
-      where: {
-        createdAt: {
-          gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+      prisma.billingRecord.aggregate({
+        _sum: { calculatedAmount: true },
+        _count: { _all: true },
+      }),
+      prisma.billingRecord.aggregate({
+        _sum: { calculatedAmount: true },
+        _count: { _all: true },
+        where: { status: 'PENDING' },
+      }),
+      prisma.billingRecord.aggregate({
+        _sum: { calculatedAmount: true },
+        _count: { _all: true },
+        where: { status: 'APPROVED' },
+      }),
+      prisma.billingRecord.aggregate({
+        _sum: { calculatedAmount: true },
+        _count: { _all: true },
+        where: { status: 'PAID' },
+      }),
+      prisma.billingRecord.aggregate({
+        _sum: { calculatedAmount: true },
+        _count: { _all: true },
+        where: {
+          createdAt: {
+            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+          },
         },
-      },
-    }),
+      }),
   ]);
 
   const totalProjects = await prisma.project.count();
@@ -117,11 +117,11 @@ export const getBillingAnalytics = async () => {
 
   return {
     summary: {
-      totalBilling: totalBilling._sum.billingAmount || 0,
-      pendingBilling: pendingBilling._sum.billingAmount || 0,
-      approvedBilling: approvedBilling._sum.billingAmount || 0,
-      paidBilling: paidBilling._sum.billingAmount || 0,
-      monthlyBilling: monthlyBilling._sum.billingAmount || 0,
+      totalBilling: Number(totalBilling._sum?.calculatedAmount) || 0,
+      pendingBilling: Number(pendingBilling._sum?.calculatedAmount) || 0,
+      approvedBilling: Number(approvedBilling._sum?.calculatedAmount) || 0,
+      paidBilling: Number(paidBilling._sum?.calculatedAmount) || 0,
+      monthlyBilling: Number(monthlyBilling._sum?.calculatedAmount) || 0,
     },
     counts: {
       totalProjects,
@@ -134,9 +134,9 @@ export const getBillingAnalytics = async () => {
 export const getBillingByProject = async () => {
   const projectBilling = await prisma.billingRecord.groupBy({
     by: ['projectId'],
-    _sum: { billingAmount: true, totalItems: true },
+    _sum: { calculatedAmount: true },
     _count: { id: true },
-    orderBy: { _sum: { billingAmount: 'desc' } },
+    orderBy: { _sum: { calculatedAmount: 'desc' } },
   });
 
   const projects = await prisma.project.findMany({
@@ -150,9 +150,8 @@ export const getBillingByProject = async () => {
     return {
       projectId: billing.projectId,
       projectName: project?.name || 'Unknown',
-      totalBilling: billing._sum.billingAmount || 0,
-      totalItems: billing._sum.totalItems || 0,
-      reportCount: billing._count.id,
+      totalBilling: billing._sum?.calculatedAmount || 0,
+      reportCount: billing._count?.id || 0,
     };
   });
 };
@@ -160,9 +159,9 @@ export const getBillingByProject = async () => {
 export const getBillingByUser = async () => {
   const userBilling = await prisma.billingRecord.groupBy({
     by: ['userId'],
-    _sum: { billingAmount: true },
+    _sum: { calculatedAmount: true },
     _count: { id: true },
-    orderBy: { _sum: { billingAmount: 'desc' } },
+    orderBy: { _sum: { calculatedAmount: 'desc' } },
   });
 
   const users = await prisma.user.findMany({
@@ -176,8 +175,8 @@ export const getBillingByUser = async () => {
     return {
       userId: billing.userId,
       userName: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'Unknown',
-      totalBilling: billing._sum.billingAmount || 0,
-      reportCount: billing._count.id,
+      totalBilling: billing._sum?.calculatedAmount || 0,
+      reportCount: billing._count?.id || 0,
     };
   });
 };

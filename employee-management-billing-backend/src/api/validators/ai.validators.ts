@@ -7,3 +7,7 @@ export const generateContentSchema = z.object({
 export const generateContentResponseSchema = z.object({
   generatedText: z.string(),
 });
+
+export const aiRequestSchema = (data: any) => {
+  return generateContentSchema.parse(data);
+};

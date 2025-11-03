@@ -3,22 +3,23 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { UserRole } from '../../types';
 import { APP_NAME, THEME } from '../../constants';
-import { 
-  HomeIcon, 
-  UserGroupIcon, 
-  UserPlusIcon, 
-  ArrowRightOnRectangleIcon, 
-  XMarkIcon, 
-  CreditCardIcon, 
+import {
+  HomeIcon,
+  UserGroupIcon,
+  UserPlusIcon,
+  ArrowRightOnRectangleIcon,
+  XMarkIcon,
+  CreditCardIcon,
   BriefcaseIcon,
-  DocumentPlusIcon, 
+  DocumentPlusIcon,
   ClockIcon,
   CalendarDaysIcon,
-  CalculatorIcon, 
-  PaperAirplaneIcon, 
+  CalculatorIcon,
+  PaperAirplaneIcon,
   ChatBubbleLeftEllipsisIcon,
-  DocumentChartBarIcon, 
-  KeyIcon 
+  DocumentChartBarIcon,
+  KeyIcon,
+  TableCellsIcon
 } from '@heroicons/react/24/outline';
 
 interface SidebarProps {
@@ -83,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
 
           {user?.role === UserRole.ADMIN && (
             <>
-              <NavLink to={appPath("/admin/employees")} className={navLinkClass} onClick={() => setIsOpen(false)}>
+              <NavLink to={appPath("/admin/users")} className={navLinkClass} onClick={() => setIsOpen(false)}>
                 <UserGroupIcon className="h-5 w-5 mr-3" />
                 Manage Employees
               </NavLink>
@@ -114,6 +115,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
               <NavLink to={appPath("/admin/work-reports")} className={navLinkClass} onClick={() => setIsOpen(false)}>
                 <DocumentChartBarIcon className="h-5 w-5 mr-3" />
                 Work Reports
+              </NavLink>
+              <NavLink to={appPath("/admin/object-registry")} className={navLinkClass} onClick={() => setIsOpen(false)}>
+                <TableCellsIcon className="h-5 w-5 mr-3" />
+                Object ID Registry
               </NavLink>
               <NavLink to={appPath("/admin/send-notification")} className={navLinkClass} onClick={() => setIsOpen(false)}>
                 <PaperAirplaneIcon className="h-5 w-5 mr-3" />

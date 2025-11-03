@@ -3,8 +3,10 @@ import React, { useState, useEffect } from 'react';
 import { fetchAdminDashboardData } from '../../services/api';
 import { AdminDashboardData } from '../../types';
 import { THEME, POSITIVE_MESSAGES } from '../../constants';
-import { useAuth } from '../../hooks/useAuth'; 
+import { useAuth } from '../../hooks/useAuth';
+import { useSocket } from '../../context/SocketContext';
 import { UsersIcon, UserGroupIcon, BriefcaseIcon, UserMinusIcon, UserPlusIcon } from '@heroicons/react/24/outline';
+import ObjectIdRegistry from '../Admin/ObjectIdRegistry';
 
 
 const StatCard: React.FC<{ title: string; value: string | number; icon: React.ReactNode; bgColorClass: string; textColorClass: string }> = ({ title, value, icon, bgColorClass, textColorClass }) => (
@@ -21,18 +23,33 @@ const StatCard: React.FC<{ title: string; value: string | number; icon: React.Re
 
 
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth(); 
+  const { user } = useAuth();
+  const { socket } = useSocket();
   const [data, setData] = useState<AdminDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [positiveMessage, setPositiveMessage] = useState<string>('');
 
   useEffect(() => {
+    if (socket) {
+      socket.on('dashboard-update', (update: AdminDashboardData) => {
+        setData(update);
+      });
+    }
+
+    return () => {
+      if (socket) {
+        socket.off('dashboard-update');
+      }
+    };
+  }, [socket]);
+
+  useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const adminData = await fetchAdminDashboardData(); 
+        const adminData = await fetchAdminDashboardData();
         setData(adminData);
       } catch (err: any) {
         setError(err.message || 'Failed to load dashboard data.');
@@ -72,42 +89,49 @@ const AdminDashboard: React.FC = () => {
         <p className={`text-md text-${THEME.accentText} -mt-2 mb-4`}>{positiveMessage}</p>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard 
-            title="Total Employees" 
-            value={data.totalEmployees} 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-5 gap-6">
+        <StatCard
+            title="Total Employees"
+            value={data.totalEmployees}
             icon={<UserGroupIcon className="h-8 w-8" />}
             bgColorClass={`bg-${THEME.primary}`}
             textColorClass={`text-${THEME.primaryText}`}
         />
-        <StatCard 
-            title="Active Users" 
-            value={data.activeUsers} 
+        <StatCard
+            title="Active Users"
+            value={data.activeUsers}
             icon={<UsersIcon className="h-8 w-8" />}
             bgColorClass={`bg-${THEME.secondary}`}
             textColorClass={`text-${THEME.secondaryText}`}
         />
-        <StatCard 
-            title="Present Today" 
-            value={data.presentToday} 
+        <StatCard
+            title="Present Today"
+            value={data.presentToday}
             icon={<UserPlusIcon className="h-8 w-8" />}
             bgColorClass={`bg-blue-500`}
             textColorClass={`text-white`}
         />
-        <StatCard 
-            title="Absent Today" 
-            value={data.absentToday} 
+        <StatCard
+            title="Absent Today"
+            value={data.absentToday}
             icon={<UserMinusIcon className="h-8 w-8" />}
             bgColorClass={`bg-orange-500`}
+            textColorClass={`text-white`}
+        />
+        <StatCard
+            title="Total Earnings"
+            value={`₹${data.totalEarnings?.toLocaleString('en-IN') || '0'}`}
+            icon={<BriefcaseIcon className="h-8 w-8" />}
+            bgColorClass={`bg-green-500`}
             textColorClass={`text-white`}
         />
       </div>
 
       <div className={`mt-8 p-6 bg-white rounded-xl shadow-lg`}>
-        <h3 className={`text-xl font-semibold text-${THEME.accentText} mb-4`}>Ongoing Projects</h3>
-        {data.ongoingProjects && data.ongoingProjects.length > 0 ? (
+        <h3 className={`text-xl font-semibold text-${THEME.accentText} mb-4`}>Projects</h3>
+        {data.projects && data.projects.length > 0 ? (
             <ul className={`text-sm text-gray-700 space-y-2`}>
-                {data.ongoingProjects.map(project => (
+                {data.projects.map(project => (
                     <li key={project.id} className={`p-2 bg-gray-50 rounded-md flex items-center`}>
                         <BriefcaseIcon className={`h-4 w-4 mr-2 text-${THEME.secondary}`} />
                         {project.name}
@@ -115,8 +139,13 @@ const AdminDashboard: React.FC = () => {
                 ))}
             </ul>
         ) : (
-            <p className={`text-sm text-gray-500`}>No ongoing projects listed currently.</p>
+            <p className={`text-sm text-gray-500`}>No projects listed currently.</p>
         )}
+      </div>
+
+      {/* Object ID Registry Section */}
+      <div className={`mt-8`}>
+        <ObjectIdRegistry />
       </div>
 
     </div>
